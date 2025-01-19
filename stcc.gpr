@@ -1,0 +1,27 @@
+with "config/stcc_config.gpr";
+project Stcc is
+
+   for Source_Dirs use ("src/", "config/");
+   for Object_Dir use "obj/" & Stcc_Config.Build_Profile;
+   for Create_Missing_Dirs use "True";
+   for Exec_Dir use "bin";
+   for Main use ("main.adb");
+
+   package Compiler is
+      for Default_Switches ("Ada") use Stcc_Config.Ada_Compiler_Switches;
+      for Local_Configuration_Pragmas use "configuration_pragmas.adc";
+   end Compiler;
+
+   package Binder is
+      for Switches ("Ada") use ("-Es"); --  Symbolic traceback
+   end Binder;
+
+   package Builder is
+      for Executable ("main.adb") use "stcc";
+   end Builder;
+
+   package Install is
+      for Artifacts (".") use ("share");
+   end Install;
+
+end Stcc;

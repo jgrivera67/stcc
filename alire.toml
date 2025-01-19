@@ -1,0 +1,12 @@
+name = "stcc"
+description = "Strong-Typed C Compiler"
+version = "0.1.0-dev"
+
+authors = ["J. German Rivera"]
+maintainers = ["J. German Rivera <jgrivera67@gmail.com>"]
+maintainers-logins = ["jgrivera67"]
+licenses = "Apache-2.0"
+website = ""
+tags = []
+
+executables = ["stcc"]
