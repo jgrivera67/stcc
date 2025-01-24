@@ -11,6 +11,7 @@
 with STC_Compiler.Lexer;
 with STC_Compiler.Parser;
 with Ada.Exceptions;
+with Ada.Strings.Fixed;
 
 package body STC_Compiler is
    procedure Compile_File (File_Name : String) with SPARK_Mode => Off is
@@ -18,7 +19,7 @@ package body STC_Compiler is
    begin
       Log_Message ("Compiling file " & File_Name & " ...");
       Init_Compiler (Compiler_Obj, File_Name);
-
+      Parser.Parse_File (Compiler_Obj);
       Cleanup_Compiler (Compiler_Obj);
 
    exception
@@ -34,8 +35,8 @@ package body STC_Compiler is
                         Name => File_Name);
 
       Compiler_Obj.File_Name := new String'(File_Name);
-      Lexer.Init_Lexer (Compiler_Obj.Lexer_Obj);
-      Parser.Init_Parser (Compiler_Obj.Parser_Obj);
+      Lexer.Init_Lexer (Compiler_Obj);
+      Parser.Init_Parser (Compiler_Obj);
       Compiler_Obj.Initialized := True;
    end Init_Compiler;
 
@@ -51,9 +52,12 @@ package body STC_Compiler is
    end Log_Message;
 
    procedure Log_Compiler_Error (Compiler_Obj : Compiler_Type; Message : String) is
+      use Ada.Strings.Fixed;
       Lexer_Obj : Lexer_Type renames Compiler_Obj.Lexer_Obj;
    begin
-      Log_Message (Compiler_Obj.File_Name.all & ":" & Lexer_Obj.Line_Number'Image &
-                   ":" & Lexer_Obj.Column_Number'Image & " error: " & Message);
+      Log_Message (Compiler_Obj.File_Name.all & ":" &
+                   Trim (Lexer_Obj.Line_Number'Image, Ada.Strings.Left) & ":" &
+                   Trim (Lexer_Obj.Column_Number'Image, Ada.Strings.Left) &
+                   " error: " & Message);
    end Log_Compiler_Error;
 end STC_Compiler;
