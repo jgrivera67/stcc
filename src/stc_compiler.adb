@@ -23,7 +23,7 @@ package body STC_Compiler is
       Cleanup_Compiler (Compiler_Obj);
 
    exception
-      when E : Ada.Text_IO.Name_Error | Storage_Error | Program_Error =>
+      when E : others =>
          Ada.Text_IO.Put_Line (Ada.Text_IO.Standard_Error, Ada.Exceptions.Exception_Message (E));
          raise;
    end Compile_File;

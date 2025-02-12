@@ -7,10 +7,16 @@
 
 with Ada.Text_IO;
 private package STC_Compiler.Lexer is
-   procedure Init_Lexer (Compiler_Obj : out Compiler_Type);
+   procedure Init_Lexer (Compiler_Obj : out Compiler_Type)
+      with Pre => Ada.Text_IO.Is_Open (Compiler_Obj.File_Obj),
+           Post => Compiler_Obj.Lexer_Obj.Lookahead_Char /= ASCII.NUL or else
+                   Ada.Text_IO.end_Of_File (Compiler_Obj.File_Obj);
+
    procedure Get_Next_Token (Compiler_Obj : in out Compiler_Type;
                              Token_Obj : out Token_Type)
       with Pre => Ada.Text_IO.Is_Open (Compiler_Obj.File_Obj) and then
-                  Compiler_Obj.Lexer_Obj.Lookahead_Char /= ASCII.NUL;
+                  (Compiler_Obj.Lexer_Obj.Lookahead_Char /= ASCII.NUL or else
+                   Ada.Text_IO.End_Of_File (Compiler_Obj.File_Obj));
+
 
 end STC_Compiler.Lexer;

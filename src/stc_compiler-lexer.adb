@@ -209,11 +209,21 @@ is
             raise Program_Error;
          end if;
 
-         Token_Obj.String_Buffer (Cursor) := Lexer_Obj.Lookahead_Char;
+         if Lexer_Obj.Lookahead_Char = ''' then
+            Token_Obj.String_Buffer (Cursor) := '_';
+         else
+            Token_Obj.String_Buffer (Cursor) := Lexer_Obj.Lookahead_Char;
+         end if;
+
          Cursor := @ + 1;
          Get_Next_Char (Compiler_Obj);
-         exit when Lexer_Obj.Lookahead_Char not in '0' .. '9';
+         exit when Lexer_Obj.Lookahead_Char not in '0' .. '9' | ''' | '_';
       end loop;
+
+      if Token_Obj.String_Buffer (Cursor - 1) = '_' then
+         Log_Compiler_Error (Compiler_Obj, "Expected decimal digit: '" & Lexer_Obj.Lookahead_Char & "'");
+         raise Program_Error;
+      end if;
 
       if Lexer_Obj.Lookahead_Char = '.' then
          Token_Obj.String_Buffer (Cursor) := '.';
@@ -242,11 +252,22 @@ is
             raise Program_Error;
          end if;
 
-         Token_Obj.String_Buffer (Cursor) := Lexer_Obj.Lookahead_Char;
+         if Lexer_Obj.Lookahead_Char = ''' then
+            Token_Obj.String_Buffer (Cursor) := '_';
+         else
+            Token_Obj.String_Buffer (Cursor) := Lexer_Obj.Lookahead_Char;
+         end if;
+
          Cursor := @ + 1;
          Get_Next_Char (Compiler_Obj);
-         exit when not Is_Hexadecimal_Digit (Lexer_Obj.Lookahead_Char);
+         exit when not (Is_Hexadecimal_Digit (Lexer_Obj.Lookahead_Char) or else
+                        Lexer_Obj.Lookahead_Char in ''' | '_');
       end loop;
+
+      if Token_Obj.String_Buffer (Cursor - 1) = '_' then
+         Log_Compiler_Error (Compiler_Obj, "Expected hexadecimal digit: '" & Lexer_Obj.Lookahead_Char & "'");
+         raise Program_Error;
+      end if;
 
       Token_Obj.String_Length := Cursor - 1;
       Token_Obj.Kind := Hexadecimal_Integer_Literal_Token;
@@ -269,11 +290,21 @@ is
             raise Program_Error;
          end if;
 
-         Token_Obj.String_Buffer (Cursor) := Lexer_Obj.Lookahead_Char;
+         if Lexer_Obj.Lookahead_Char = ''' then
+            Token_Obj.String_Buffer (Cursor) := '_';
+         else
+            Token_Obj.String_Buffer (Cursor) := Lexer_Obj.Lookahead_Char;
+         end if;
+
          Cursor := @ + 1;
          Get_Next_Char (Compiler_Obj);
-         exit when Lexer_Obj.Lookahead_Char not in '0' .. '1';
+         exit when Lexer_Obj.Lookahead_Char not in '0' .. '1' | ''' | '_';
       end loop;
+
+      if Token_Obj.String_Buffer (Cursor - 1) = '_' then
+         Log_Compiler_Error (Compiler_Obj, "Expected binary digit: '" & Lexer_Obj.Lookahead_Char & "'");
+         raise Program_Error;
+      end if;
 
       Token_Obj.String_Length := Cursor - 1;
       Token_Obj.Kind := Binary_Integer_Literal_Token;
@@ -516,14 +547,18 @@ is
       Pre => Reserved_Words_Table.Is_Empty,
       Post => not Reserved_Words_Table.Is_Empty is
    begin
+      Reserved_Words_Table.Insert ("as", As_Token);
+      Reserved_Words_Table.Insert ("at", At_Token); --  attribute
       Reserved_Words_Table.Insert ("assert", Assert_Token);
+      Reserved_Words_Table.Insert ("auto", Assert_Token);
       Reserved_Words_Table.Insert ("bool", Bool_Token);
       Reserved_Words_Table.Insert ("break", Break_Token);
       Reserved_Words_Table.Insert ("case", Case_Token);
       Reserved_Words_Table.Insert ("char", Char_Token);
+      Reserved_Words_Table.Insert ("compile_if", Compile_If_Token);
       Reserved_Words_Table.Insert ("const", Const_Token);
       Reserved_Words_Table.Insert ("continue", Continue_Token);
-      Reserved_Words_Table.Insert ("convention", Convention_Token);
+      Reserved_Words_Table.Insert ("convention", Convention_Token); --  attribute
       Reserved_Words_Table.Insert ("default", Default_Token);
       Reserved_Words_Table.Insert ("do", Do_Token);
       Reserved_Words_Table.Insert ("else", Else_Token);
@@ -535,18 +570,22 @@ is
       Reserved_Words_Table.Insert ("if", If_Token);
       Reserved_Words_Table.Insert ("in", In_Token);
       Reserved_Words_Table.Insert ("inout", Inout_Token);
-      Reserved_Words_Table.Insert ("invanriant", Invariant_Token);
+      Reserved_Words_Table.Insert ("invariant", Invariant_Token); --  attribute
       Reserved_Words_Table.Insert ("import", Import_Token);
+      Reserved_Words_Table.Insert ("lambda", Lambda_Token);
       Reserved_Words_Table.Insert ("machine_width", Machine_Width_Token);
       Reserved_Words_Table.Insert ("mod", Mod_Token);
       Reserved_Words_Table.Insert ("out", Out_Token);
-      Reserved_Words_Table.Insert ("post", Post_Token);
-      Reserved_Words_Table.Insert ("pre", Pre_Token);
+      Reserved_Words_Table.Insert ("packed", Packed_Token); --  attribute
+      Reserved_Words_Table.Insert ("post", Post_Token); --  attribute
+      Reserved_Words_Table.Insert ("pre", Pre_Token); --  attribute
       Reserved_Words_Table.Insert ("private", Private_Token);
       Reserved_Words_Table.Insert ("range", Range_Token);
       Reserved_Words_Table.Insert ("renames", Renames_Token);
       Reserved_Words_Table.Insert ("return", Return_Token);
+      Reserved_Words_Table.Insert ("size", Size_Token); --  attribute
       Reserved_Words_Table.Insert ("sizeof", Sizeof_Token);
+      Reserved_Words_Table.Insert ("static", Struct_Token);
       Reserved_Words_Table.Insert ("struct", Struct_Token);
       Reserved_Words_Table.Insert ("subtype", Subtype_Token);
       Reserved_Words_Table.Insert ("switch", Switch_Token);
