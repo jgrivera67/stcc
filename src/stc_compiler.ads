@@ -121,6 +121,7 @@ private
       Void_Token,
       Volatile_Token,
       While_Token,
+
       Invalid_Token
    );
 
@@ -129,7 +130,7 @@ private
    subtype Token_String_Cursor_Type is Positive range 1 .. Lexical_Unit_String_Max_Size + 1;
    subtype Token_String_Length_Type is Natural range 0 .. Lexical_Unit_String_Max_Size;
 
-   type Token_Type is record
+   type Token_Type is limited record
       Kind : Token_Kind_Type := Invalid_Token;
       Is_Operator : Boolean := False;
       --  Buffer to gather next token string from the input file
@@ -193,13 +194,14 @@ private
       AST_For_Node,
       AST_Function_Call_Node,
       AST_Function_Declaration_Node,
-      AST_Functional_If_Node,
+      AST_Functional_If_Else_Node,
       AST_If_Node,
       AST_Literal_Node,
       AST_Statement_Block_Node,
       AST_Switch_Node,
       AST_Switch_Case_Node,
       AST_Switch_Default_Node,
+      AST_Type_Cast_Node,
       AST_Type_Declaration_Node,
       AST_Unary_Expression_Node,
       AST_Variable_Declaration_Node,
@@ -207,28 +209,43 @@ private
       AST_While_Node
    );
 
-   type AST_Binary_Operator_Type is (
-      AST_Add_Op,
-      AST_And_Op,
-      AST_Assignment_Op,
-      AST_Divide_Op,
-      AST_Multiply_Op,
-      AST_Or_Op,
-      AST_Modulo_Op,
-      AST_Range_Op,
-      AST_Struct_Field_Op,
-      AST_Struct_Field_Dereference_Op,
-      AST_Subtract_Op,
-      AST_Xor_Op,
-      AST_Invalid_Binary_Op
-   );
-
-   type AST_Unary_Operator_Type is (
+   type AST_Operator_Type is (
+      AST_Arithmetic_Add_Op,
+      AST_Arithmetic_Different_From_Op,
+      AST_Arithmetic_Equal_To_Op,
+      AST_Arithmetic_Greater_Than_Op,
+      AST_Arithmetic_Greater_Than_Or_Equal_To_Op,
+      AST_Arithmetic_Less_Than_Op,
+      AST_Arithmetic_Less_Than_Or_Equal_To_Op,
+      AST_Arithmetic_Divide_Op,
+      AST_Arithmetic_In_Range_Op,
+      AST_Arithmetic_Modulo_Op,
+      AST_Arithmetic_Multiply_Op,
+      AST_Arithmetic_Negate_Sign_Op,
+      AST_Arithmetic_Range_Op,
+      AST_Arithmetic_Subtract_Op,
+      AST_Address_Of_Op,
+      AST_Array_Declaration_Op,
+      AST_Array_Subscript_Op,
+      AST_Bitwise_And_Op,
+      AST_Bitwise_Left_Shift_Op,
       AST_Bitwise_Not_Op,
+      AST_Bitwise_Or_Op,
+      AST_Bitwise_Right_Shift_Op,
+      AST_Bitwise_Xor_Op,
+      AST_Functional_If_Else_Op,
+      AST_Function_Call_Op,
+      AST_Logical_And_Op,
       AST_Logical_Not_Op,
-      AST_Negate_Op,
-      AST_Pointer_Op,
-      AST_Invalid_Unary_Op
+      AST_Logical_Or_Op,
+      AST_Pointer_Declaration_Op,
+      AST_Pointer_Dereference_Op,
+      AST_Sizeof_Op,
+      AST_Struct_Field_Op,
+      AST_Struct_Pointer_Field_Dereference_Op,
+      AST_Type_Cast_Op,
+
+      AST_Invalid_Op
    );
 
    type AST_Literal_Kind_Type is (
@@ -245,9 +262,11 @@ private
    type AST_Node_Type (Node_Kind : AST_Node_Kind_Type) is limited record
       Parent : AST_Node_Pointer_Type := null;
       Next_Sibling : AST_Node_Pointer_Type := null;
+      --  Pointer to next node in operand or operator stack during expression parsing
+      Next_In_Stack :  AST_Node_Pointer_Type := null;
       case Node_Kind is
          when AST_Binary_Expression_Node =>
-            Binary_Operator : AST_Binary_Operator_Type := AST_Invalid_Binary_Op;
+            Binary_Operator : AST_Operator_Type := AST_Invalid_Op;
             Left_Operand : AST_Node_Pointer_Type := null;
             Right_Operand : AST_Node_Pointer_Type := null;
          when AST_Compilation_Unit_Node =>
@@ -267,14 +286,14 @@ private
             For_Next_Step : AST_Node_Pointer_Type := null;
             For_Body : AST_Node_Pointer_Type := null;
          when AST_Function_Call_Node =>
-            Invocation_Name : Identifier_Pointer_Type := null;
+            Function_Reference : AST_Node_Pointer_Type := null;
             First_Argument : AST_Node_Pointer_Type := null;
          when AST_Function_Declaration_Node =>
             Function_Name : Identifier_Pointer_Type := null;
             Return_Type : AST_Node_Pointer_Type := null;
             First_Parameter : AST_Node_Pointer_Type := null;
             Function_Body : AST_Node_Pointer_Type := null;
-         when AST_Functional_If_Node =>
+         when AST_Functional_If_Else_Node =>
             Functional_If_Condition : AST_Node_Pointer_Type := null;
             Functional_If_True_Operand : AST_Node_Pointer_Type := null;
             Functional_If_False_Operand : AST_Node_Pointer_Type := null;
@@ -297,10 +316,14 @@ private
             Switch_Case_First_Statement : AST_Node_Pointer_Type := null;
          when AST_Switch_Default_Node =>
             Switch_Default_First_Statement : AST_Node_Pointer_Type := null;
+         when AST_Type_Cast_Node =>
+            Type_Reference : Identifier_Pointer_Type := null;
+            Operand_Expression : AST_Node_Pointer_Type := null;
          when AST_Type_Declaration_Node =>
             Type_Name : Identifier_Pointer_Type := null;
+            Type_Body : AST_Node_Pointer_Type := null;
          when AST_Unary_Expression_Node =>
-            Unary_Operator : AST_Unary_Operator_Type := AST_Invalid_Unary_Op;
+            Unary_Operator : AST_Operator_Type := AST_Invalid_Op;
             Operand : AST_Node_Pointer_Type := null;
          when AST_Variable_Declaration_Node =>
             Variable_Name : Identifier_Pointer_Type := null;
@@ -316,10 +339,21 @@ private
    --  Parser State Variables  --
    ------------------------------
 
+   Num_Tokens_Remembered : constant := 2;
+
+   type Tokens_Array_Index_Type is mod Num_Tokens_Remembered;
+
+   type Tokens_Array_Type is array (Tokens_Array_Index_Type) of Token_Type;
+
    type Parser_Type is limited record
-      Last_Token : Token_Type;
+      Latest_Tokens : Tokens_Array_Type;
+      Next_Token_Index : Tokens_Array_Index_Type := 0;
+      Current_Token_Index : Tokens_Array_Index_Type := Tokens_Array_Index_Type'Last;
       AST_Root : AST_Node_Pointer_Type := null;
-   end record;
+      Operand_Stack_Top : AST_Node_Pointer_Type := null;
+      Operator_Stack_Top : AST_Node_Pointer_Type := null;
+   end record
+      with Dynamic_Predicate => Parser_Type.Next_Token_Index = Parser_Type.Current_Token_Index + 1;
 
    --------------------------------
    --  Compiler State Variables  --
@@ -348,5 +382,9 @@ private
 
    procedure Log_Compiler_Error (Compiler_Obj : Compiler_Type; Message : String)
       with Pre => Compiler_Obj.Initialized;
+
+   function Get_Currrent_Token_Kind (Compiler_Obj : Compiler_Type) return Token_Kind_Type is
+      (Compiler_Obj.Parser_Obj.Latest_Tokens (Compiler_Obj.Parser_Obj.Current_Token_Index).Kind)
+      with Ghost;
 
 end STC_Compiler;

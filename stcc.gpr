@@ -8,7 +8,7 @@ project Stcc is
    for Main use ("main.adb");
 
    package Compiler is
-      for Default_Switches ("Ada") use Stcc_Config.Ada_Compiler_Switches;
+      for Default_Switches ("Ada") use Stcc_Config.Ada_Compiler_Switches & ("-gnat2022", "-gnatX");
       for Local_Configuration_Pragmas use "configuration_pragmas.adc";
    end Compiler;
 

@@ -30,7 +30,7 @@ is
          Lexer_Obj.Lookahead_Char := ASCII.NUL;
    end Get_Next_Char;
 
-   procedure Init_Lexer (Compiler_Obj : out Compiler_Type) is
+   procedure Init_Lexer (Compiler_Obj : in out Compiler_Type) is
    begin
       Get_Next_Char (Compiler_Obj);
    end Init_Lexer;
@@ -310,11 +310,13 @@ is
       Token_Obj.Kind := Binary_Integer_Literal_Token;
    end Scan_Binary_Integer_Literal;
 
-   procedure Get_Next_Token (Compiler_Obj : in out Compiler_Type;
-                             Token_Obj : out Token_Type) is
+   procedure Get_Next_Token (Compiler_Obj : in out Compiler_Type) is
       Lexer_Obj : Lexer_Type renames Compiler_Obj.Lexer_Obj;
+      Parser_Obj : Parser_Type renames Compiler_Obj.Parser_Obj;
+      Token_Obj : Token_Type renames Parser_Obj.Latest_Tokens (Parser_Obj.Next_Token_Index);
    begin
-      Token_Obj := (others => <>);
+      Token_Obj.Kind := Invalid_Token;
+      Token_Obj.Is_Operator := False;
       Skip_Separators (Compiler_Obj);
       if Ada.Characters.Handling.Is_Letter (Lexer_Obj.Lookahead_Char) then
          Scan_Identifier_Or_Reserved_Word (Compiler_Obj, Token_Obj);
@@ -352,8 +354,12 @@ is
                Get_Next_Char (Compiler_Obj);
                if Lexer_Obj.Lookahead_Char = '=' then
                   Get_Next_Char (Compiler_Obj);
+                  Token_Obj.String_Buffer (1 .. 2) := "==";
+                  Token_Obj.String_Length := 2;
                   Token_Obj.Kind := Equality_Op_Token;
                else
+                  Token_Obj.String_Buffer (1) := '=';
+                  Token_Obj.String_Length := 1;
                   Token_Obj.Kind := Assignment_Op_Token;
                end if;
                Token_Obj.Is_Operator := True;
@@ -361,11 +367,17 @@ is
                Get_Next_Char (Compiler_Obj);
                if Lexer_Obj.Lookahead_Char = '&' then
                   Get_Next_Char (Compiler_Obj);
+                  Token_Obj.String_Buffer (1 .. 2) := "&&";
+                  Token_Obj.String_Length := 2;
                   Token_Obj.Kind := Logical_And_Op_Token;
                elsif Lexer_Obj.Lookahead_Char = '=' then
                   Get_Next_Char (Compiler_Obj);
+                  Token_Obj.String_Buffer (1 .. 2) := "&=";
+                  Token_Obj.String_Length := 2;
                   Token_Obj.Kind := Assignment_Bitwise_And_Op_Token;
                else
+                  Token_Obj.String_Buffer (1) := '&';
+                  Token_Obj.String_Length := 1;
                   Token_Obj.Kind := Ampersand_Op_Token;
                end if;
                Token_Obj.Is_Operator := True;
@@ -373,11 +385,17 @@ is
                Get_Next_Char (Compiler_Obj);
                if Lexer_Obj.Lookahead_Char = '|' then
                   Get_Next_Char (Compiler_Obj);
+                  Token_Obj.String_Buffer (1 .. 2) := "||";
+                  Token_Obj.String_Length := 2;
                   Token_Obj.Kind := Logical_Or_Op_Token;
                elsif Lexer_Obj.Lookahead_Char = '=' then
                   Get_Next_Char (Compiler_Obj);
+                  Token_Obj.String_Buffer (1 .. 2) := "|=";
+                  Token_Obj.String_Length := 2;
                   Token_Obj.Kind := Assignment_Bitwise_Or_Op_Token;
                else
+                  Token_Obj.String_Buffer (1) := '|';
+                  Token_Obj.String_Length := 1;
                   Token_Obj.Kind := Bitwise_Or_Op_Token;
                end if;
                Token_Obj.Is_Operator := True;
@@ -387,14 +405,22 @@ is
                   Get_Next_Char (Compiler_Obj);
                   if Lexer_Obj.Lookahead_Char = '=' then
                      Get_Next_Char (Compiler_Obj);
+                     Token_Obj.String_Buffer (1 .. 3) := "<<=";
+                     Token_Obj.String_Length := 3;
                      Token_Obj.Kind := Assignment_Bitwise_Left_Shift_Op_Token;
                   else
+                     Token_Obj.String_Buffer (1 .. 2) := "<<";
+                     Token_Obj.String_Length := 2;
                      Token_Obj.Kind := Bitwise_Left_Shift_Op_Token;
                   end if;
                elsif Lexer_Obj.Lookahead_Char = '=' then
                   Get_Next_Char (Compiler_Obj);
+                  Token_Obj.String_Buffer (1 .. 2) := "<=";
+                  Token_Obj.String_Length := 2;
                   Token_Obj.Kind := Less_Than_Or_Equal_Op_Token;
                else
+                  Token_Obj.String_Buffer (1) := '<';
+                  Token_Obj.String_Length := 1;
                   Token_Obj.Kind := Less_Than_Op_Token;
                end if;
                Token_Obj.Is_Operator := True;
@@ -404,14 +430,22 @@ is
                   Get_Next_Char (Compiler_Obj);
                   if Lexer_Obj.Lookahead_Char = '=' then
                      Get_Next_Char (Compiler_Obj);
+                     Token_Obj.String_Buffer (1 .. 3) := ">>=";
+                     Token_Obj.String_Length := 3;
                      Token_Obj.Kind := Assignment_Bitwise_Right_Shift_Op_Token;
                   else
+                     Token_Obj.String_Buffer (1 .. 2) := ">>";
+                     Token_Obj.String_Length := 2;
                      Token_Obj.Kind := Bitwise_Right_Shift_Op_Token;
                   end if;
                elsif Lexer_Obj.Lookahead_Char = '=' then
                   Get_Next_Char (Compiler_Obj);
+                  Token_Obj.String_Buffer (1 .. 2) := ">=";
+                  Token_Obj.String_Length := 2;
                   Token_Obj.Kind := Greater_Than_Or_Equal_Op_Token;
                else
+                  Token_Obj.String_Buffer (1) := '>';
+                  Token_Obj.String_Length := 1;
                   Token_Obj.Kind := Greater_Than_Op_Token;
                end if;
                Token_Obj.Is_Operator := True;
@@ -419,8 +453,12 @@ is
                Get_Next_Char (Compiler_Obj);
                if Lexer_Obj.Lookahead_Char = '=' then
                   Get_Next_Char (Compiler_Obj);
+                  Token_Obj.String_Buffer (1 .. 2) := "^=";
+                  Token_Obj.String_Length := 2;
                   Token_Obj.Kind := Assignment_Bitwise_Xor_Op_Token;
                else
+                  Token_Obj.String_Buffer (1) := '^';
+                  Token_Obj.String_Length := 1;
                   Token_Obj.Kind := Bitwise_Xor_Op_Token;
                end if;
                Token_Obj.Is_Operator := True;
@@ -428,8 +466,12 @@ is
                Get_Next_Char (Compiler_Obj);
                if Lexer_Obj.Lookahead_Char = '=' then
                   Get_Next_Char (Compiler_Obj);
+                  Token_Obj.String_Buffer (1 .. 2) := "+=";
+                  Token_Obj.String_Length := 2;
                   Token_Obj.Kind := Assignment_Plus_Op_Token;
                else
+                  Token_Obj.String_Buffer (1) := '+';
+                  Token_Obj.String_Length := 1;
                   Token_Obj.Kind := Plus_Op_Token;
                end if;
                Token_Obj.Is_Operator := True;
@@ -437,11 +479,17 @@ is
                Get_Next_Char (Compiler_Obj);
                if Lexer_Obj.Lookahead_Char = '=' then
                   Get_Next_Char (Compiler_Obj);
+                  Token_Obj.String_Buffer (1 .. 2) := "-=";
+                  Token_Obj.String_Length := 2;
                   Token_Obj.Kind := Assignment_Minus_Op_Token;
                elsif Lexer_Obj.Lookahead_Char = '>' then
                   Get_Next_Char (Compiler_Obj);
+                  Token_Obj.String_Buffer (1 .. 2) := "->";
+                  Token_Obj.String_Length := 2;
                   Token_Obj.Kind := Arrow_Op_Token;
                else
+                  Token_Obj.String_Buffer (1) := '-';
+                  Token_Obj.String_Length := 1;
                   Token_Obj.Kind := Minus_Op_Token;
                end if;
                Token_Obj.Is_Operator := True;
@@ -449,8 +497,12 @@ is
                Get_Next_Char (Compiler_Obj);
                if Lexer_Obj.Lookahead_Char = '=' then
                   Get_Next_Char (Compiler_Obj);
+                  Token_Obj.String_Buffer (1 .. 2) := "*=";
+                  Token_Obj.String_Length := 2;
                   Token_Obj.Kind := Assignment_Multiply_Op_Token;
                else
+                  Token_Obj.String_Buffer (1) := '*';
+                  Token_Obj.String_Length := 1;
                   Token_Obj.Kind := Asterisk_Op_Token;
                end if;
                Token_Obj.Is_Operator := True;
@@ -458,8 +510,12 @@ is
                Get_Next_Char (Compiler_Obj);
                if Lexer_Obj.Lookahead_Char = '=' then
                   Get_Next_Char (Compiler_Obj);
+                  Token_Obj.String_Buffer (1 .. 2) := "%=";
+                  Token_Obj.String_Length := 2;
                   Token_Obj.Kind := Assignment_Modulo_Op_Token;
                else
+                  Token_Obj.String_Buffer (1) := '%';
+                  Token_Obj.String_Length := 1;
                   Token_Obj.Kind := Modulo_Op_Token;
                end if;
                Token_Obj.Is_Operator := True;
@@ -470,9 +526,13 @@ is
                   Scan_Line_Comment (Compiler_Obj, Token_Obj);
                elsif Lexer_Obj.Lookahead_Char = '=' then
                   Get_Next_Char (Compiler_Obj);
+                  Token_Obj.String_Buffer (1 .. 2) := "/=";
+                  Token_Obj.String_Length := 2;
                   Token_Obj.Kind := Assignment_Divide_Op_Token;
                   Token_Obj.Is_Operator := True;
                else
+                  Token_Obj.String_Buffer (1) := '/';
+                  Token_Obj.String_Length := 1;
                   Token_Obj.Kind := Divide_Op_Token;
                   Token_Obj.Is_Operator := True;
                end if;
@@ -480,57 +540,91 @@ is
                Get_Next_Char (Compiler_Obj);
                if Lexer_Obj.Lookahead_Char = '.' then
                   Get_Next_Char (Compiler_Obj);
+                  Token_Obj.String_Buffer (1 .. 2) := "..";
+                  Token_Obj.String_Length := 2;
                   Token_Obj.Kind := Range_Op_Token;
                else
+                  Token_Obj.String_Buffer (1) := '.';
+                  Token_Obj.String_Length := 1;
                   Token_Obj.Kind := Dot_Op_Token;
                end if;
                Token_Obj.Is_Operator := True;
             when '!' =>
                Get_Next_Char (Compiler_Obj);
+               Token_Obj.String_Buffer (1) := '!';
+               Token_Obj.String_Length := 1;
                Token_Obj.Kind := Logical_Not_Op_Token;
                Token_Obj.Is_Operator := True;
             when '~' =>
                Get_Next_Char (Compiler_Obj);
+               Token_Obj.String_Buffer (1) := '~';
+               Token_Obj.String_Length := 1;
                Token_Obj.Kind := Bitwise_Not_Op_Token;
                Token_Obj.Is_Operator := True;
             when ',' =>
                Get_Next_Char (Compiler_Obj);
+               Token_Obj.String_Buffer (1) := ',';
+               Token_Obj.String_Length := 1;
                Token_Obj.Kind := Comma_Token;
             when ';' =>
                Get_Next_Char (Compiler_Obj);
+               Token_Obj.String_Buffer (1) := ';';
+               Token_Obj.String_Length := 1;
                Token_Obj.Kind := Semicolon_Token;
             when '?' =>
                Get_Next_Char (Compiler_Obj);
+               Token_Obj.String_Buffer (1) := '?';
+               Token_Obj.String_Length := 1;
                Token_Obj.Kind := Question_Mark_Token;
+               Token_Obj.Is_Operator := True;
             when ':' =>
                Get_Next_Char (Compiler_Obj);
+               Token_Obj.String_Buffer (1) := ':';
+               Token_Obj.String_Length := 1;
                Token_Obj.Kind := Colon_Token;
+               Token_Obj.Is_Operator := True;
             when '{' =>
                Get_Next_Char (Compiler_Obj);
+               Token_Obj.String_Buffer (1) := '{';
+               Token_Obj.String_Length := 1;
                Token_Obj.Kind := Left_Curly_Brace_Token;
             when '(' =>
                Get_Next_Char (Compiler_Obj);
+               Token_Obj.String_Buffer (1) := '(';
+               Token_Obj.String_Length := 1;
                Token_Obj.Kind := Left_Parenthesis_Token;
             when '[' =>
                Get_Next_Char (Compiler_Obj);
                if Lexer_Obj.Lookahead_Char = '[' then
                   Get_Next_Char (Compiler_Obj);
+                  Token_Obj.String_Buffer (1 .. 2) := "[[";
+                  Token_Obj.String_Length := 2;
                   Token_Obj.Kind := Left_Double_Square_Parenthesis_Token;
                else
+                  Token_Obj.String_Buffer (1) := '[';
+                  Token_Obj.String_Length := 1;
                   Token_Obj.Kind := Left_Square_Parenthesis_Token;
                end if;
             when '}' =>
                Get_Next_Char (Compiler_Obj);
+               Token_Obj.String_Buffer (1) := '}';
+               Token_Obj.String_Length := 1;
                Token_Obj.Kind := Right_Curly_Brace_Token;
             when ')' =>
                Get_Next_Char (Compiler_Obj);
+               Token_Obj.String_Buffer (1) := ')';
+               Token_Obj.String_Length := 1;
                Token_Obj.Kind := Right_Parenthesis_Token;
             when ']' =>
                Get_Next_Char (Compiler_Obj);
                if Lexer_Obj.Lookahead_Char = ']' then
                   Get_Next_Char (Compiler_Obj);
+                  Token_Obj.String_Buffer (1 .. 2) := "]]";
+                  Token_Obj.String_Length := 2;
                   Token_Obj.Kind := Right_Double_Square_Parenthesis_Token;
                else
+                  Token_Obj.String_Buffer (1) := ']';
+                  Token_Obj.String_Length := 1;
                   Token_Obj.Kind := Right_Square_Parenthesis_Token;
                end if;
             when ASCII.NUL =>
@@ -541,6 +635,9 @@ is
                raise Program_Error;
          end case;
       end if;
+
+      Parser_Obj.Current_Token_Index := Parser_Obj.Next_Token_Index;
+      Parser_Obj.Next_Token_Index := @ + 1;
    end Get_Next_Token;
 
    procedure Init_Reserved_Words_Table with
