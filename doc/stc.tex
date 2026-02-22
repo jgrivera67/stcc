@@ -1,0 +1,241 @@
+\documentclass[11pt,letterpaper,twoside,openany]{book}
+%\usepackage{lineno}
+%\usepackage{afterpage}
+\usepackage[pdftex]{graphicx}
+\usepackage[pdftex, pdfborder={0 0 0}]{hyperref}
+\usepackage[pdftex]{lscape}
+\usepackage{listings}
+%\usepackage{longtable}
+%\usepackage{fancyvrb}
+\usepackage{listings}
+\usepackage{syntax}
+\usepackage{float}
+
+%\lstset{basicstyle=\tiny}
+\lstset{basicstyle=\small}
+
+\addtolength{\textheight}{0.6in}
+%\addtolength{\textheight}{1.25in}
+
+\addtolength{\textwidth}{0.6in}
+%\addtolength{\textwidth}{0.5in}
+
+%\setlength{\parskip}{5pt plus1pt minus1pt}
+%\addtocounter{secnumdepth}{1}
+
+\pagestyle{plain}
+%\linenumbers
+
+\begin{document}
+\title{The \emph{Strong-Typed C (stC)} Programming Language}
+\author{Germ\'an Rivera \\
+        \texttt jgrivera67@gmail.com}
+\date{\today}
+\maketitle
+
+\frontmatter
+\tableofcontents
+%\listoffigures
+
+\mainmatter
+\raggedbottom
+\pagestyle{myheadings}
+\markboth{stC: Strong-Typed C Language}{stC: Strong-Typed C Language}
+
+\chapter{Introduction}
+
+Although most embedded software developers recognize the importance of strong
+typing, as a tool to write more reliable software, many get discouraged of
+using Ada, the strongest-typed language there is, just because of its syntactic
+verbosity, or perhaps simply because Ada does not look more like C.
+
+What if we could have a new programming language for embedded software that looks
+like C but has an Ada soul, that is, a language with all the Ada concepts but
+in a C skin, C with a strong-typed armor, and where using pointers is more
+the exception than the norm.
+
+This document presents the \emph{stC} (\emph{``Strong-Typed C''} programming language)
+for safety-critical embedded software development.
+
+A proof-of-concept compiler for \emph{stC}, known as \verb'stcc', has been written
+in SPARK Ada. SPARK Ada \cite{SparkAda} is a high integrity subset of the Ada programming
+language. The code of \verb'stcc' is available in GitHub at \url{https://github.com/jgrivera67/stcc}.
+
+\section{Language Overview}
+\begin{itemize}
+\item \emph{stC} is a fully strong-typed language. That is, There is no automatic integer promotion
+ or any other implicit type conversions.
+\item There are no built-in integer types in \emph{stC}. All integer types must be explicitly declared,
+using language constructs to define range-based or modular-based integer types. The only built-in
+types \verb'bool' and \verb'char'.
+\item Types can be qualified with logical predicates to support ``liquid types''
+      (\emph{logically qualified} types).
+\item Arrays cannot implicitly be treated as pointers and they carry their length when
+      passed-in as parameters to functions.
+\item There are no header files and no preprocessor.
+\item Declarations can be in any order. Symbols can be used before they are declared.
+      In \emph{stC} there is no need for function prototypes or forward declarations.
+\item A translation unit has an explicit name specified at the beginning of the source file with the
+      \verb'unit' keyword.
+\item A translation unit can import public declarations from other translation units, using their unit names.
+\item A translation unit can have private declarations that are not visible to other translation units.
+\item A translation unit can have child translation units. A child unit is
+      named by using its parent unit's name followed by a dot as a prefix.
+\item  A child unit inherits all the public and private declarations of its ancestor units.
+       However, inherited private declarations cannot be used in the visible parts of the unit's public
+       declarations.
+\item The language is case-sensitive. All reserved words are lower case.
+\item The language is block-structured. Blocks are delimited by curly braces.
+\end{itemize}
+
+\section{stcc}
+\verb'stcc' does not generate machine code at the moment. It is only a ``transpiler'' which
+translates a \emph{stC} source file into equivalent SPARK Ada 2022 source code.
+
+\begin{itemize}
+\item For each \emph{stC} file an Ada package specification file (\verb'.ads') and an Ada package
+body file (\verb'.adb') are generated. To compile these files with the GNAT compiler, the \verb'-gnatX' flag
+must be used, to enable the curated subset of GNAT language extensions, which are used in the generated
+files \cite{gnatX}.
+
+\item Line number form the original \emph{stC} source file are included as end-of-line comments
+in the generated Ada code.
+\end{itemize}
+
+\chapter{\emph{stC} Grammar}
+
+%\begin{grammar}
+\begin{lstlisting}[numbersep=0pt,resetmargins=true]
+<compilation-unit> ::=
+   "unit" <unit-name> ";"
+   ("import" <unit-name> ("as" <unit-identifier>)? ";")*
+   <declaration>*
+   ("private"
+    ("import" <unit-name> ";")*
+    <declaration>+)?
+
+<unit-name> ::= "<identifier>" ("." "<identifier>")*
+
+<unit-identifier> ::= "<identifier>"
+
+<declaration> ::=
+   <constant-declaration> |
+   <type-declaration> |
+   <variable-declaration> |
+   <function-declaration> |
+   <foreign-variable-declaration> |
+   <foreign-function-declaration>
+
+<constant-declaration> ::=
+   "const" <type-identifier> <constant-declarator> "=" <constant-expression> ";"
+
+<constant-declarator> ::=
+   ("*")? <constant-identifier>
+             ("[" "]" ("[" <constant-integer-expression> "]")*)? ";"
+
+<constant-identifier> ::= "<identifier>"
+
+<type-declaration> ::=
+   "type" <type-declarator> <type-identifier> (<type-attributes>)? ";"
+
+<type-identifier> ::= "<identifier>"
+
+<type-declarator> ::=
+   "range" <constant-integer-expression> ".." <constant-integer-expression> |
+   "mod" <constant-integer-expression> |
+   ("struct" | "union") "{" (<struct-field-declaration> ";")+ "}" |
+   "enum" "{" <enum-entry> ("," <enum-entry>)* "}"
+
+<struct-field-declaration> ::=
+   "<identifier>" <struct-field-declarator> ("=" <constant-expression>)?
+
+<struct-field-declarator> ::=
+   ("*")? <struct-field-identifier>
+            ("[" <constant-integer-expression> "]")*
+
+<struct-field-identifier> ::= "<identifier>"
+
+<enum-entry> ::=
+   <enum-entry-identifier> ("=" <constant-integer-expression>)?
+
+<enum-entry-identifier> ::= "<identifier>"
+
+<global-variable-declaration> ::=
+   "<type-identifier>" <global-variable-declarator>
+   ("=" <constant-expression>)? (<variable-attributes>)? ";"
+
+<global-variable-declarator> ::=
+   ("*")? <global-variable-identifier>
+            ("[" <constant-integer-expression> "]")*
+
+<global-variable-identifier> ::= "<identifier>"
+
+<function-declaration> ::=
+   ("void" | <type-identifier> ("*")?) <function-identifier>
+       "(" (<param-declaration> ("," <param-declaration>)*)? ")"
+       (<function-attributes>)?
+       <statement-block>
+
+<function-identifier> ::= "<identifier>"
+
+<statement-block> ::=
+      "{" (<local-variable-declaration> | <statement>)* "}"
+
+<local-variable-declaration> ::=
+   "<type-identifier>" <local-variable-declarator> ("=" <expression>)? ";"
+
+<local-variable-declarator> ::=
+   ("*")? <local-variable-identifier> ("[" <index-expression> "]")*
+
+<local-variable-identifier> ::= "<identifier>"
+
+<statement> ::=
+    <assignment> |
+    <void-function-call> |
+    <if-statement> |
+    <while-statement> |
+    <for-statement> |
+    <do-while-statement> |
+    <switch-statement> |
+    <statement-block> |
+    <return-statement>
+
+<assignment> ::= <variable-reference> "=" <expression>
+
+<void-function-call> ::= <void-function-reference>  "(" (<function-call-argument> ("," <function-call-argument>)*)? ")"
+
+<void-function-reference> ::=
+  <void-function-identifier> |
+  <void-function-pointer-expression>
+
+<if-statement> ::= "if" "(" <boolean-expression> ")" <statement-block> ("else" <statement-blovk>)?
+
+<constant-integer-expression> ::=
+   "<binary-integer-literal>" |
+   "<decimal-integer-literal>" |
+   "<hexadecimal-integer-literal>" |
+   <constant-identifier> |
+   <integer-unary-op> <constant-integer-expression> |
+   <constant-integer-expression> <integer-binary-op>
+      <constant-integer-expression>
+
+<variable-reference> ::=
+  <variable-identifier> ("." <struct-field-identifier> ("[" <index-expression> "]")*)* |
+  <variable-identifier> ("[" <index-expression> "]")*
+
+\end{lstlisting}
+%\end{grammar}
+
+\begin{thebibliography}{9}
+
+\bibitem{SparkAda}
+John W. McCormick, Peter C. Chapin, \emph{Building High Integrity Applications with SPARK}, Cambridge University Press, 2015 \\
+\url{https://www.amazon.com/Building-High-Integrity-Applications-SPARK/dp/1107040736}
+
+\bibitem{gnatX}
+AdaCore, ``GNAT Reference Manual'', chapter 17, version 26.0w \\
+\url{https://docs.adacore.com/gnat_rm-docs/html/gnat_rm/gnat_rm/gnat_language_extensions.html}
+
+\end{thebibliography}
+
+\end{document}
