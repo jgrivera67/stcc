@@ -671,13 +671,33 @@ package body STC_Compiler.Parser is
                      end loop;
                      return;
                   end if;
-                  --  TODO: Lookup identifier in symbol table
-                  --  For now, create a variable reference node
-                  declare
-                     Var_Ref_Node : constant AST_Node_Pointer_Type := new AST_Node_Type (AST_Variable_Reference_Node);
-                  begin
-                     Operand_Stack_Push (Var_Ref_Node);
-                  end;
+
+                  --  Check for built-in constants
+                  if Current_Token_Obj.String_Length = 13 and then
+                     Current_Token_Obj.String_Buffer (1 .. 13) = "machine_width"
+                  then
+                     --  Replace machine_width with its integer value
+                     declare
+                        Literal_Node : constant AST_Node_Pointer_Type :=
+                           new AST_Node_Type (AST_Literal_Node);
+                        Width_Str : constant String := Compiler_Obj.Machine_Width'Image;
+                        --  'Image includes leading space for positive numbers, so skip it
+                        Width_Str_Trimmed : constant String := Width_Str (2 .. Width_Str'Last);
+                     begin
+                        Literal_Node.Literal_Kind := AST_Decimal_Integer_Literal_Kind;
+                        Literal_Node.Literal_Value := new String'(Width_Str_Trimmed);
+                        Operand_Stack_Push (Literal_Node);
+                     end;
+                  else
+                     --  TODO: Lookup identifier in symbol table
+                     --  For now, create a variable reference node
+                     declare
+                        Var_Ref_Node : constant AST_Node_Pointer_Type :=
+                           new AST_Node_Type (AST_Variable_Reference_Node);
+                     begin
+                        Operand_Stack_Push (Var_Ref_Node);
+                     end;
+                  end if;
 
                when Decimal_Integer_Literal_Token =>
                   Create_Literal_Node (AST_Decimal_Integer_Literal_Kind);
@@ -811,7 +831,11 @@ package body STC_Compiler.Parser is
 
                when Left_Parenthesis_Token =>
                   --  Recursive call to parse subexpression
+                  Lexer.Get_Next_Token (Compiler_Obj);  --  Skip '('
                   Parse_Expression (Compiler_Obj, Parser_Obj.Operator_Stack_Top);
+                  --  Parse_Expression returns when it sees ')', so skip it
+                  pragma Assert (Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind =
+                                Right_Parenthesis_Token);
 
                when Right_Parenthesis_Token |
                     Semicolon_Token |

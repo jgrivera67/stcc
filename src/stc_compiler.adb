@@ -14,11 +14,11 @@ with Ada.Exceptions;
 with Ada.Strings.Fixed;
 
 package body STC_Compiler is
-   procedure Compile_File (File_Name : String) with SPARK_Mode => Off is
+   procedure Compile_File (File_Name : String; Machine_Width : Positive := 32) with SPARK_Mode => Off is
       Compiler_Obj : Compiler_Type := (others => <>);
    begin
       Log_Message ("Compiling file " & File_Name & " ...");
-      Init_Compiler (Compiler_Obj, File_Name);
+      Init_Compiler (Compiler_Obj, File_Name, Machine_Width);
       Parser.Parse_File (Compiler_Obj);
       Cleanup_Compiler (Compiler_Obj);
 
@@ -28,13 +28,14 @@ package body STC_Compiler is
          raise;
    end Compile_File;
 
-   procedure Init_Compiler (Compiler_Obj : out Compiler_Type; File_Name : String) is
+   procedure Init_Compiler (Compiler_Obj : out Compiler_Type; File_Name : String; Machine_Width : Positive := 32) is
    begin
       Ada.Text_IO.Open (File => Compiler_Obj.File_Obj,
                         Mode => Ada.Text_IO.In_File,
                         Name => File_Name);
 
       Compiler_Obj.File_Name := new String'(File_Name);
+      Compiler_Obj.Machine_Width := Machine_Width;
       Compiler_Obj.Initialized := True;
       Lexer.Init_Lexer (Compiler_Obj);
       Parser.Init_Parser (Compiler_Obj);

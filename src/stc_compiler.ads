@@ -12,7 +12,7 @@ private with Ada.Text_IO;
 private with Ada.Containers.Indefinite_Ordered_Maps;
 
 package STC_Compiler is
-   procedure Compile_File (File_Name : String);
+   procedure Compile_File (File_Name : String; Machine_Width : Positive := 32);
 
 private
    type String_Pointer_Type is access String;
@@ -369,9 +369,10 @@ private
       File_Obj : Ada.Text_IO.File_Type;
       Lexer_Obj  : Lexer_Type;
       Parser_Obj : Parser_Type;
+      Machine_Width : Positive := 32;
    end record;
 
-   procedure Init_Compiler (Compiler_Obj : out Compiler_Type; File_Name : String)
+   procedure Init_Compiler (Compiler_Obj : out Compiler_Type; File_Name : String; Machine_Width : Positive := 32)
       with Pre => not Compiler_Obj.Initialized,
            Post => Compiler_Obj.Initialized and then
                    Ada.Text_IO.Is_Open (Compiler_Obj.File_Obj);

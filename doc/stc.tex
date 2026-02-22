@@ -126,12 +126,14 @@ case        char        compile_if  const       continue
 convention  default     do          else        enum
 false       for         foreign     goto        if
 import      in          inout       invariant   lambda
-machine_width  modular  module      out         packed
-post        pre         private     range       renames
-return      size        sizeof      static      struct
-subtype     switch      true        type        union
-void        volatile    while
+modular     module      out         packed      post
+pre         private     range       renames     return
+size        sizeof      static      struct      subtype
+switch      true        type        union       void
+volatile    while
 \end{lstlisting}
+
+Note: \verb'machine_width' is not a keyword but a built-in constant (see section on Built-in Constants).
 
 \section{Identifiers}
 An identifier consists of a letter followed by zero or more letters, digits, or underscores:
@@ -225,7 +227,7 @@ int x = 42; // Comment after code
 \end{lstlisting}
 
 \section{Built-in Constants}
-\emph{stC} provides platform-specific built-in constants that are configured through a compiler configuration file.
+\emph{stC} provides platform-specific built-in constants that can be configured via compiler command-line options.
 
 \subsection{Platform Constants}
 The following built-in constants are available:
@@ -233,21 +235,14 @@ The following built-in constants are available:
 \item \verb'machine_width' -- The native word size in bits (e.g., 8, 16, 32, 64)
 \end{itemize}
 
-\subsection{Compiler Configuration File}
-The compiler looks for a configuration file named \verb'stcc-config.json' in the current directory. If not found, default values are used. The configuration file format is:
+\subsection{Compiler Options}
+The \verb'machine_width' constant can be set using the command-line option:
 
 \begin{lstlisting}
-{
-  "platform": {
-    "machine_width": 32
-  }
-}
+stcc --machine-width=64 program.stc
 \end{lstlisting}
 
-\textbf{Default values} (used when no config file is present):
-\begin{itemize}
-\item \verb'machine_width': 32 (suitable for most embedded platforms)
-\end{itemize}
+\textbf{Default value:} 32 (suitable for most embedded platforms)
 
 \textbf{Example usage:}
 \begin{lstlisting}

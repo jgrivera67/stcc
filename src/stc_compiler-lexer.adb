@@ -676,7 +676,8 @@ is
       Reserved_Words_Table.Insert ("invariant", Invariant_Token); --  attribute
       Reserved_Words_Table.Insert ("import", Import_Token);
       Reserved_Words_Table.Insert ("lambda", Lambda_Token);
-      Reserved_Words_Table.Insert ("machine_width", Machine_Width_Token);
+      --  machine_width is a built-in constant, not a keyword
+      --  It's handled as an identifier by the lexer and substituted in the parser
       Reserved_Words_Table.Insert ("mod", Mod_Token);
       Reserved_Words_Table.Insert ("modular", Modular_Token);
       Reserved_Words_Table.Insert ("module", Module_Token);
