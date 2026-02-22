@@ -7,7 +7,9 @@
 \usepackage{listings}
 %\usepackage{longtable}
 %\usepackage{fancyvrb}
+\usepackage{textcomp}
 \usepackage{listings}
+\lstset{upquote=true}
 \usepackage{syntax}
 \usepackage{float}
 
@@ -77,7 +79,7 @@ types \verb'bool' and \verb'char'.
       In \emph{stC} there is no need for function prototypes or forward declarations.
 \item A translation unit has an explicit name specified at the beginning of the source file with the
       \verb'unit' keyword.
-\item A translation unit can import public declarations from other translation units, using their unit names.
+\item A translation unit (module) can import public declarations from other translation units, using their module names.
 \item A translation unit can have private declarations that are not visible to other translation units.
 \item A translation unit can have child translation units. A child unit is
       named by using its parent unit's name followed by a dot as a prefix.
@@ -102,21 +104,174 @@ files \cite{gnatX}.
 in the generated Ada code.
 \end{itemize}
 
+\chapter{Lexical Elements}
+
+\section{Tokens}
+The lexical structure of \emph{stC} consists of the following token types:
+\begin{itemize}
+\item Keywords (reserved words)
+\item Identifiers
+\item Literals (integer, floating-point, character, string, boolean)
+\item Operators
+\item Punctuation symbols
+\item Comments
+\end{itemize}
+
+\section{Keywords}
+The following identifiers are reserved as keywords and cannot be used as identifiers:
+
+\begin{lstlisting}
+as          assert      auto        bool        break
+case        char        compile_if  const       continue
+convention  default     do          else        enum
+false       for         foreign     goto        if
+import      in          inout       invariant   lambda
+machine_width  modular  module      out         packed
+post        pre         private     range       renames
+return      size        sizeof      static      struct
+subtype     switch      true        type        union
+void        volatile    while
+\end{lstlisting}
+
+\section{Identifiers}
+An identifier consists of a letter followed by zero or more letters, digits, or underscores:
+\begin{lstlisting}
+identifier   = letter (letter | digit | '_')*
+letter       = 'a'..'z' | 'A'..'Z'
+digit        = '0'..'9'
+\end{lstlisting}
+
+Identifiers are case-sensitive. Examples: \verb'myVariable', \verb'Count_1', \verb'MAX_SIZE'
+
+\section{Literals}
+
+\subsection{Integer Literals}
+\emph{stC} supports three integer literal formats:
+\begin{itemize}
+\item \textbf{Decimal}: \verb'0', \verb'42', \verb'1234'
+\item \textbf{Hexadecimal}: \verb'0x0', \verb'0x2A', \verb'0x4D2', \verb'0xDEADBEEF'
+\item \textbf{Binary}: \verb'0b0', \verb'0b101010', \verb'0b11111111'
+\end{itemize}
+
+\subsection{Floating-Point Literals}
+Floating-point literals have the form:
+\begin{lstlisting}
+3.14
+2.71828
+1.0e10
+6.022e23
+\end{lstlisting}
+
+\subsection{Character Literals}
+Character literals are enclosed in single quotes:
+\begin{lstlisting}
+'a'  'Z'  '0'  '\n'  '\t'  '\\'  '\''
+\end{lstlisting}
+
+Escape sequences:
+\begin{itemize}
+\item \verb'\n' -- newline
+\item \verb'\t' -- tab
+\item \verb'\r' -- carriage return
+\item \verb'\\' -- backslash
+\item \verb'\'' -- single quote
+\item \verb'\"' -- double quote
+\item \verb'\0' -- null character
+\end{itemize}
+
+\subsection{String Literals}
+String literals are enclosed in double quotes:
+\begin{lstlisting}
+"Hello, World!"
+"Line 1\nLine 2"
+"Path: C:\\Users\\name"
+\end{lstlisting}
+
+\subsection{Boolean Literals}
+The boolean type has two literals: \verb'true' and \verb'false'
+
+\section{Operators}
+\emph{stC} provides the following operators, listed by precedence (highest to lowest):
+
+\begin{center}
+\begin{tabular}{|l|l|c|}
+\hline
+\textbf{Precedence} & \textbf{Operators} & \textbf{Associativity} \\
+\hline
+16 & \verb'.' \verb'->' \verb'[]' \verb'()' (function call, cast) & Left \\
+15 & \verb'**' (exponentiation) & Right \\
+14 & \verb'*' (deref) \verb'&' (address-of) \verb'sizeof' \verb'!' \verb'~' \verb'-' (unary) \verb'+' (unary) & Right \\
+13 & \verb'*' \verb'/' \verb'%' & Left \\
+12 & \verb'+' \verb'-' & Left \\
+11 & \verb'<<' \verb'>>' & Left \\
+10 & \verb'<' \verb'>' \verb'<=' \verb'>=' \verb'..' & Left \\
+9 & \verb'==' \verb'!=' \verb'in' & Left \\
+8 & \verb'&' (bitwise and) & Left \\
+7 & \verb'^' & Left \\
+6 & \verb'|' & Left \\
+5 & \verb'&&' & Left \\
+4 & \verb'||' & Left \\
+3 & \verb'?' \verb':' (ternary) & Right \\
+2 & \verb'=' \verb'+=' \verb'-=' \verb'*=' \verb'/=' \verb'%=' \verb'&=' \verb'|=' \verb'^=' \verb'<<=' \verb'>>=' & Right \\
+\hline
+\end{tabular}
+\end{center}
+
+\section{Comments}
+\emph{stC} supports single-line comments starting with \verb'//' and extending to the end of the line:
+\begin{lstlisting}
+// This is a comment
+int x = 42; // Comment after code
+\end{lstlisting}
+
+\section{Built-in Constants}
+\emph{stC} provides platform-specific built-in constants that are configured through a compiler configuration file.
+
+\subsection{Platform Constants}
+The following built-in constants are available:
+\begin{itemize}
+\item \verb'machine_width' -- The native word size in bits (e.g., 8, 16, 32, 64)
+\end{itemize}
+
+\subsection{Compiler Configuration File}
+The compiler looks for a configuration file named \verb'stcc-config.json' in the current directory. If not found, default values are used. The configuration file format is:
+
+\begin{lstlisting}
+{
+  "platform": {
+    "machine_width": 32
+  }
+}
+\end{lstlisting}
+
+\textbf{Default values} (used when no config file is present):
+\begin{itemize}
+\item \verb'machine_width': 32 (suitable for most embedded platforms)
+\end{itemize}
+
+\textbf{Example usage:}
+\begin{lstlisting}
+module stdint {
+  // Creates a modular type sized to the platform's native word
+  type modular 1 << machine_width address_t;
+}
+\end{lstlisting}
+
 \chapter{\emph{stC} Grammar}
 
 %\begin{grammar}
 \begin{lstlisting}[numbersep=0pt,resetmargins=true]
-<compilation-unit> ::=
-   "unit" <unit-name> ";"
-   ("import" <unit-name> ("as" <unit-identifier>)? ";")*
+<translation-unit> ::=
+   "module" <module-name> "{"
+   ("import" <module-name> ("as" <module-identifier>)? ";")*
    <declaration>*
    ("private"
-    ("import" <unit-name> ";")*
-    <declaration>+)?
+    ("import" <module-name> ";")*
+    <declaration>+)? "}"
 
-<unit-name> ::= "<identifier>" ("." "<identifier>")*
+<module-name> ::= "<identifier>" ("." "<identifier>")*
 
-<unit-identifier> ::= "<identifier>"
+<module-identifier> ::= "<identifier>"
 
 <declaration> ::=
    <constant-declaration> |
@@ -142,12 +297,12 @@ in the generated Ada code.
 
 <type-declarator> ::=
    "range" <constant-integer-expression> ".." <constant-integer-expression> |
-   "mod" <constant-integer-expression> |
+   "modular" <constant-integer-expression> |
    ("struct" | "union") "{" (<struct-field-declaration> ";")+ "}" |
    "enum" "{" <enum-entry> ("," <enum-entry>)* "}"
 
 <struct-field-declaration> ::=
-   "<identifier>" <struct-field-declarator> ("=" <constant-expression>)?
+   <type-identifier> <struct-field-declarator> ("=" <constant-expression>)?
 
 <struct-field-declarator> ::=
    ("*")? <struct-field-identifier>
@@ -208,7 +363,120 @@ in the generated Ada code.
   <void-function-identifier> |
   <void-function-pointer-expression>
 
-<if-statement> ::= "if" "(" <boolean-expression> ")" <statement-block> ("else" <statement-blovk>)?
+<if-statement> ::= "if" "(" <boolean-expression> ")" <statement-block> ("else" <statement-block>)?
+
+<while-statement> ::= "while" "(" <boolean-expression> ")" <statement-block>
+
+<do-while-statement> ::= "do" <statement-block> "while" "(" <boolean-expression> ")" ";"
+
+<for-statement> ::=
+   "for" "(" (<local-variable-declaration> | <assignment>)? ";"
+   <boolean-expression>? ";"
+   <assignment>? ")" <statement-block>
+
+<switch-statement> ::=
+   "switch" "(" <expression> ")" "{"
+   <switch-case>*
+   (<default-case>)?
+   "}"
+
+<switch-case> ::= "case" <constant-expression> ":" <statement>*
+
+<default-case> ::= "default" ":" <statement>*
+
+<return-statement> ::= "return" (<expression>)? ";"
+
+<param-declaration> ::=
+   (<parameter-mode>)? <type-identifier> <param-declarator>
+
+<parameter-mode> ::= "in" | "out" | "inout"
+
+<param-declarator> ::=
+   ("*")? <param-identifier> ("[" "]" ("[" <constant-integer-expression> "]")*)?
+
+<param-identifier> ::= "<identifier>"
+
+<function-call-argument> ::= <expression>
+
+<foreign-variable-declaration> ::=
+   "foreign" "convention" "(" <string-literal> ")"
+   <type-identifier> <global-variable-declarator> ";"
+
+<foreign-function-declaration> ::=
+   "foreign" "convention" "(" <string-literal> ")"
+   ("void" | <type-identifier> ("*")?) <function-identifier>
+   "(" (<param-declaration> ("," <param-declaration>)*)? ")" ";"
+
+<expression> ::= <ternary-expression>
+
+<ternary-expression> ::=
+   <logical-or-expression> ("?" <expression> ":" <expression>)?
+
+<logical-or-expression> ::=
+   <logical-and-expression> ("||" <logical-and-expression>)*
+
+<logical-and-expression> ::=
+   <bitwise-or-expression> ("&&" <bitwise-or-expression>)*
+
+<bitwise-or-expression> ::=
+   <bitwise-xor-expression> ("|" <bitwise-xor-expression>)*
+
+<bitwise-xor-expression> ::=
+   <bitwise-and-expression> ("^" <bitwise-and-expression>)*
+
+<bitwise-and-expression> ::=
+   <equality-expression> ("&" <equality-expression>)*
+
+<equality-expression> ::=
+   <relational-expression> (("==" | "!=" | "in") <relational-expression>)*
+
+<relational-expression> ::=
+   <shift-expression> (("<" | ">" | "<=" | ">=" | "..") <shift-expression>)*
+
+<shift-expression> ::=
+   <additive-expression> (("<<" | ">>") <additive-expression>)*
+
+<additive-expression> ::=
+   <multiplicative-expression> (("+" | "-") <multiplicative-expression>)*
+
+<multiplicative-expression> ::=
+   <power-expression> (("*" | "/" | "%") <power-expression>)*
+
+<power-expression> ::=
+   <unary-expression> ("**" <unary-expression>)*
+
+<unary-expression> ::=
+   <postfix-expression> |
+   <unary-operator> <unary-expression> |
+   "sizeof" "(" (<type-identifier> | <expression>) ")"
+
+<unary-operator> ::= "+" | "-" | "!" | "~" | "*" | "&"
+
+<postfix-expression> ::=
+   <primary-expression>
+      (("[" <expression> "]") |
+       ("(" (<function-call-argument> ("," <function-call-argument>)*)? ")") |
+       ("." <struct-field-identifier>) |
+       ("->" <struct-field-identifier>))*
+
+<primary-expression> ::=
+   <identifier> |
+   <literal> |
+   "(" <expression> ")" |
+   <type-cast-expression> |
+   <lambda-expression>
+
+<type-cast-expression> ::= <type-identifier> "(" <expression> ")"
+
+<lambda-expression> ::=
+   "lambda" "(" (<param-declaration> ("," <param-declaration>)*)? ")"
+   "=>" <expression>
+
+<boolean-expression> ::= <expression>
+
+<index-expression> ::= <expression>
+
+<constant-expression> ::= <expression>
 
 <constant-integer-expression> ::=
    "<binary-integer-literal>" |
@@ -219,12 +487,377 @@ in the generated Ada code.
    <constant-integer-expression> <integer-binary-op>
       <constant-integer-expression>
 
+<integer-unary-op> ::= "+" | "-" | "~"
+
+<integer-binary-op> ::=
+   "+" | "-" | "*" | "/" | "%" | "**" | "<<" | ">>" |
+   "&" | "|" | "^"
+
+<literal> ::=
+   "<binary-integer-literal>" |
+   "<decimal-integer-literal>" |
+   "<hexadecimal-integer-literal>" |
+   "<floating-point-literal>" |
+   "<character-literal>" |
+   "<string-literal>" |
+   "<boolean-literal>"
+
+<boolean-literal> ::= "true" | "false"
+
 <variable-reference> ::=
   <variable-identifier> ("." <struct-field-identifier> ("[" <index-expression> "]")*)* |
   <variable-identifier> ("[" <index-expression> "]")*
 
+<variable-identifier> ::= "<identifier>"
+
+<void-function-identifier> ::= "<identifier>"
+
+<type-attributes> ::=
+   ("@" <type-attribute-name>)+
+
+<type-attribute-name> ::= "size" | "machine_width" | "packed" | "at" "(" <constant-expression> ")"
+
+<variable-attributes> ::=
+   ("@" <variable-attribute-name>)+
+
+<variable-attribute-name> ::= "at" "(" <constant-expression> ")" | "volatile"
+
+<function-attributes> ::=
+   <contract-clause>+
+
+<contract-clause> ::=
+   <precondition> | <postcondition> | <invariant>
+
+<precondition> ::= "pre" "(" <boolean-expression> ")"
+
+<postcondition> ::= "post" "(" <boolean-expression> ")"
+
+<invariant> ::= "invariant" "(" <boolean-expression> ")"
+
 \end{lstlisting}
 %\end{grammar}
+
+\chapter{Examples}
+
+\section{Simple Program}
+A minimal \emph{stC} program:
+\begin{lstlisting}
+module hello {
+
+  import stdio as io;
+
+  foreign convention("C")
+  int printf(in char* format);
+
+  int main() {
+    printf("Hello, World!\n");
+    return 0;
+  }
+
+}
+\end{lstlisting}
+
+\section{Type Declarations}
+
+\subsection{Range Types}
+\begin{lstlisting}
+module types_example {
+
+  // Integer types based on ranges
+  type range 0 .. 255 byte_t;
+  type range 0 .. 100 percentage_t;
+  type range -273 .. 1000 temperature_t;
+
+  percentage_t cpu_usage = 75;
+  temperature_t room_temp = 22;
+
+}
+\end{lstlisting}
+
+\subsection{Modular Types}
+\begin{lstlisting}
+// Modular arithmetic (wraps around)
+type modular 256 uint8_t;
+type modular 65536 uint16_t;
+type modular 4294967296 uint32_t;
+
+uint8_t counter = 255;
+counter = counter + 1;  // Wraps to 0
+\end{lstlisting}
+
+\subsection{Structure Types}
+\begin{lstlisting}
+type range -1000 .. 1000 coordinate_t;
+type struct {
+  coordinate_t x;
+  coordinate_t y;
+} point_t;
+
+type range 0 .. 150 age_t;
+type struct {
+  char* name;
+  age_t age;
+  bool is_employed;
+} person_t;
+
+person_t p;
+p.name = "Alice";
+p.age = 30;
+p.is_employed = true;
+\end{lstlisting}
+
+\subsection{Union Types}
+\begin{lstlisting}
+type range -2147483648 .. 2147483647 int_t;
+type union {
+  int_t int_value;
+  char* string_value;
+  bool bool_value;
+} value_t;
+\end{lstlisting}
+
+\subsection{Enumeration Types}
+\begin{lstlisting}
+type enum {
+  red,
+  green = 10,
+  blue,
+  yellow = 20
+} color_t;
+
+color_t my_color = red;
+\end{lstlisting}
+
+\section{Arrays}
+\begin{lstlisting}
+module array_example {
+
+  type range 0 .. 99 index_t;
+  index_t[100] numbers;
+  numbers[0] = 42;
+
+  // Multi-dimensional arrays
+  index_t[10][10] m;
+  m[0][0] = 1;
+
+}
+\end{lstlisting}
+
+\section{Functions}
+
+\subsection{Simple Function}
+\begin{lstlisting}
+type range -2147483648 .. 2147483647 int_t;
+
+int_t add(in int_t a, in int_t b) {
+  return a + b;
+}
+\end{lstlisting}
+
+\subsection{Function with Contracts}
+\begin{lstlisting}
+type range 0 .. 2147483647 natural_t;
+
+natural_t divide(in natural_t a, in natural_t b)
+    pre(b != 0)
+    post(result * b <= a && result * b + b > a)
+{
+  return a / b;
+}
+\end{lstlisting}
+
+\subsection{Function with Parameter Modes}
+\begin{lstlisting}
+void swap(inout int_t a, inout int_t b) {
+  int_t temp = a;
+  a = b;
+  b = temp;
+}
+
+// Usage
+int_t x = 10;
+int_t y = 20;
+swap(x, y);  // x=20, y=10
+\end{lstlisting}
+
+\section{Control Flow}
+
+\subsection{If Statement}
+\begin{lstlisting}
+type range -2147483648 .. 2147483647 int_t;
+
+int_t absolute(in int_t x) {
+  if (x < 0) {
+    return -x;
+  } else {
+    return x;
+  }
+}
+\end{lstlisting}
+
+\subsection{While Loop}
+\begin{lstlisting}
+type range 0 .. 99 index_t;
+index_t i = 0;
+
+while (i < 10) {
+  // Loop body
+  i = i + 1;
+}
+\end{lstlisting}
+
+\subsection{For Loop}
+\begin{lstlisting}
+type range 0 .. 99 index_t;
+
+for (index_t i = 0; i < 10; i = i + 1) {
+  // Loop body
+}
+\end{lstlisting}
+
+\subsection{Do-While Loop}
+\begin{lstlisting}
+type range 0 .. 99 index_t;
+index_t i = 0;
+
+do {
+  // Loop body
+  i = i + 1;
+} while (i < 10);
+\end{lstlisting}
+
+\subsection{Switch Statement}
+\begin{lstlisting}
+type enum {
+    monday, tuesday, wednesday,
+    thursday, friday, saturday, sunday
+} day_of_week_t;
+
+day_of_week_t day = monday;
+
+switch (day) {
+  case monday:
+  case tuesday:
+  case wednesday:
+  case thursday:
+  case friday:
+    // Weekday
+    break;
+  case saturday:
+  case sunday:
+    // Weekend
+    break;
+  default:
+    // Invalid
+    break;
+}
+\end{lstlisting}
+
+\section{Expressions}
+
+\subsection{Ternary Conditional}
+\begin{lstlisting}
+type range -2147483648 .. 2147483647 int_t;
+
+int_t max(in int_t a, in int_t b) {
+  return (a > b) ? a : b;
+}
+\end{lstlisting}
+
+\subsection{Range Operator}
+\begin{lstlisting}
+type range 0 .. 100 percentage_t;
+percentage_t score = 85;
+
+if (score in 90 .. 100) {
+  // Grade A
+} else {
+  if (score in 80 .. 89) {
+    // Grade B
+  }
+}
+\end{lstlisting}
+
+\section{Pointers}
+\begin{lstlisting}
+type range -2147483648 .. 2147483647 int_t;
+
+int_t x = 42;
+int_t* ptr = &x;      // Address-of operator
+int_t value = *ptr;   // Dereference operator
+
+// Pointer to struct
+type struct {
+  int_t x;
+  int_t y;
+} point_t;
+
+point_t p;
+point_t* p_ptr = &p;
+p_ptr->x = 10;      // Arrow operator
+p_ptr->y = 20;
+\end{lstlisting}
+
+\section{Lambda Expressions}
+\begin{lstlisting}
+type range -2147483648 .. 2147483647 int_t;
+
+// Lambda with no parameters
+auto get_zero = lambda() => 0;
+
+// Lambda with parameters
+auto add = lambda(in int_t a, in int_t b) => a + b;
+
+int_t result = add(3, 4);  // result = 7
+\end{lstlisting}
+
+\section{Compilation Unit Example}
+\begin{lstlisting}
+module geometry {
+
+  type range -1000 .. 1000 coordinate_t;
+
+  type struct {
+    coordinate_t x;
+    coordinate_t y;
+  } point_t;
+
+  coordinate_t distance_squared(in point_t p1, in point_t p2) {
+    coordinate_t dx = p2.x - p1.x;
+    coordinate_t dy = p2.y - p1.y;
+    return dx * dx + dy * dy;
+  }
+
+  private
+
+  // Private helper function
+  coordinate_t square(in coordinate_t x) {
+    return x * x;
+  }
+
+}
+\end{lstlisting}
+
+\section{Child Modules}
+\begin{lstlisting}
+// File: geometry.circle.stc
+module geometry.circle {
+
+  // Inherits point_t and coordinate_t from parent module geometry
+
+  type range 0 .. 1000 radius_t;
+
+  type struct {
+    point_t center;
+    radius_t radius;
+  } circle_t;
+
+  bool point_in_circle(in point_t p, in circle_t c) {
+    return distance_squared(p, c.center) <= square(c.radius);
+  }
+
+}
+\end{lstlisting}
 
 \begin{thebibliography}{9}
 

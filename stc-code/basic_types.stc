@@ -1,0 +1,76 @@
+//
+//  Test file for basic type declarations in stC
+//
+//  This file tests:
+//  - Range types
+//  - Modular types
+//  - Enum types
+//  - Struct types
+//  - Union types
+//
+
+module basic_types {
+
+  // Integer range types
+  type range 0 .. 255 byte_t;
+  type range -273 .. 1000 temperature_t;
+  type range 1 .. 100 index_t;
+
+  // Modular types
+  type modular 256 unsigned_byte_t;
+  type modular 1 << 16 uint16_t;
+  type modular 1 << 32 uint32_t;
+
+  // Enumeration types
+  type enum { red, green, blue } color_t;
+  type enum { idle, running, stopped, error } status_t;
+  type enum { mon, tue, wed, thu, fri, sat, sun } day_t;
+
+  // Structure types
+  type struct {
+    byte_t x;
+    byte_t y;
+  } point_t;
+
+  type struct {
+    point_t top_left;
+    uint16_t width;
+    uint16_t height;
+  } rectangle_t;
+
+  type struct {
+    byte_t age;
+    status_t status;
+  } person_t;
+
+  // Union types
+  type union {
+    uint32_t int_value;
+    byte_t byte_value;
+  } data_t;
+
+  // Nested structures with pointers
+  type struct {
+    uint32_t data;
+    struct node_t* next;
+  } node_t;
+
+  type struct {
+    uint32_t id;
+    point_t location;
+    rectangle_t bounds;
+    color_t category;
+    status_t state;
+  } complex_struct_t;
+
+  private
+
+  // Private types
+  type modular 1024 internal_buffer_t;
+
+  type struct {
+    uint32_t secret;
+    uint32_t timestamp;
+  } private_record_t;
+
+}

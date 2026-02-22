@@ -35,9 +35,9 @@ package body STC_Compiler is
                         Name => File_Name);
 
       Compiler_Obj.File_Name := new String'(File_Name);
+      Compiler_Obj.Initialized := True;
       Lexer.Init_Lexer (Compiler_Obj);
       Parser.Init_Parser (Compiler_Obj);
-      Compiler_Obj.Initialized := True;
    end Init_Compiler;
 
    procedure Cleanup_Compiler (Compiler_Obj : in out Compiler_Type) is

@@ -1,4 +1,4 @@
 pragma Ada_2022;
 pragma SPARK_Mode (On);
 pragma Assertion_Policy (Check);
-pragma Extensions_Allowed (All);
+pragma Extensions_Allowed (On);

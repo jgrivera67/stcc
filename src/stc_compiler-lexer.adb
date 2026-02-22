@@ -144,25 +144,22 @@ is
    procedure Scan_Line_Comment (Compiler_Obj : in out Compiler_Type;
                                 Token_Obj : out Token_Type) is
       Lexer_Obj : Lexer_Type renames Compiler_Obj.Lexer_Obj;
-      Cursor : Token_String_Cursor_Type := 1;
    begin
-      --  Scan characters up to next new line character or end of file:
-      loop
-         exit when Lexer_Obj.Lookahead_Char = ASCII.LF or else Lexer_Obj.Lookahead_Char = ASCII.NUL;
-         if Cursor > Token_Obj.String_Buffer'Length then
-            Token_Obj.String_Length := Token_Obj.String_Buffer'Length;
-            Log_Compiler_Error (Compiler_Obj, "Token is too long: '" & Token_Obj.String_Buffer & "'");
-            raise Program_Error;
+      --  Skip the rest of the line
+      if not Ada.Text_IO.End_Of_File (Compiler_Obj.File_Obj) then
+         Ada.Text_IO.Skip_Line (Compiler_Obj.File_Obj);
+         Lexer_Obj.Line_Number := @ + 1;
+         Lexer_Obj.Column_Number := 1;
+         --  Read first character of next line
+         if not Ada.Text_IO.End_Of_File (Compiler_Obj.File_Obj) then
+            Ada.Text_IO.Get (Compiler_Obj.File_Obj, Lexer_Obj.Lookahead_Char);
+         else
+            Lexer_Obj.Lookahead_Char := ASCII.NUL;
          end if;
+      end if;
 
-         Token_Obj.String_Buffer (Cursor) := Lexer_Obj.Lookahead_Char;
-         Cursor := @ + 1;
-         Get_Next_Char (Compiler_Obj);
-      end loop;
-
-      Token_Obj.String_Length := Cursor - 1;
+      Token_Obj.String_Length := 0;
       Token_Obj.Kind := Line_Comment_Token;
-      Get_Next_Char (Compiler_Obj);
    end Scan_Line_Comment;
 
    procedure Scan_Floating_Point_Literal_Fraction_Part (Compiler_Obj : in out Compiler_Type;
@@ -500,6 +497,11 @@ is
                   Token_Obj.String_Buffer (1 .. 2) := "*=";
                   Token_Obj.String_Length := 2;
                   Token_Obj.Kind := Assignment_Multiply_Op_Token;
+               elsif Lexer_Obj.Lookahead_Char = '*' then
+                  Get_Next_Char (Compiler_Obj);
+                  Token_Obj.String_Buffer (1 .. 2) := "**";
+                  Token_Obj.String_Length := 2;
+                  Token_Obj.Kind := Power_Op_Token;
                else
                   Token_Obj.String_Buffer (1) := '*';
                   Token_Obj.String_Length := 1;
@@ -522,7 +524,6 @@ is
             when '/' =>
                Get_Next_Char (Compiler_Obj);
                if Lexer_Obj.Lookahead_Char = '/' then
-                  Get_Next_Char (Compiler_Obj);
                   Scan_Line_Comment (Compiler_Obj, Token_Obj);
                elsif Lexer_Obj.Lookahead_Char = '=' then
                   Get_Next_Char (Compiler_Obj);
@@ -638,6 +639,11 @@ is
 
       Parser_Obj.Current_Token_Index := Parser_Obj.Next_Token_Index;
       Parser_Obj.Next_Token_Index := @ + 1;
+
+      --  Skip comments by tail recursively calling Get_Next_Token
+      if Token_Obj.Kind = Line_Comment_Token then
+         Get_Next_Token (Compiler_Obj);
+      end if;
    end Get_Next_Token;
 
    procedure Init_Reserved_Words_Table with
@@ -672,6 +678,8 @@ is
       Reserved_Words_Table.Insert ("lambda", Lambda_Token);
       Reserved_Words_Table.Insert ("machine_width", Machine_Width_Token);
       Reserved_Words_Table.Insert ("mod", Mod_Token);
+      Reserved_Words_Table.Insert ("modular", Modular_Token);
+      Reserved_Words_Table.Insert ("module", Module_Token);
       Reserved_Words_Table.Insert ("out", Out_Token);
       Reserved_Words_Table.Insert ("packed", Packed_Token); --  attribute
       Reserved_Words_Table.Insert ("post", Post_Token); --  attribute

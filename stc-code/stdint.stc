@@ -4,8 +4,12 @@
 //
 //  SPDX-License-Identifier: Apache-2.0
 //
-type mod 1 << machine_width address_t;
+module stdint {
 
-type mod 1 << 8 uint8_t;
-type range 0 .. (1 << 8) - 1 o_uint8_t;
-type range -(1 << 8) .. (1 << 8) - 1 int8_t;
+  type modular 1 << machine_width address_t;
+
+  type modular 1 << 8 uint8_t;
+  type range 0 .. (1 << 8) - 1 o_uint8_t;
+  type range -(1 << 8) .. (1 << 8) - 1 int8_t;
+
+}

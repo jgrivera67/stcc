@@ -1,0 +1,5 @@
+module testsimple {
+
+  type range 0 .. 255 byte_t;
+
+}

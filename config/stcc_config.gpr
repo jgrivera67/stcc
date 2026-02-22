@@ -32,7 +32,7 @@ abstract project Stcc_Config is
            ,"-gnatyI" -- check mode IN keywords
            ,"-gnatyk" -- Check keyword casing
            ,"-gnatyl" -- Check layout
-           ,"-gnatyM120" -- Check maximum line length
+           ,"-gnatyM120" -- Check maximum line length (120 chars)
            ,"-gnatyn" -- Check casing of entities in Standard
            ,"-gnatyO" -- Check that overriding subprograms are explicitly marked as such
            ,"-gnatyp" -- Check pragma casing
