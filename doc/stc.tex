@@ -161,25 +161,16 @@ Separators are allowed between digits but not at the beginning or end of a numbe
 
 \textbf{Examples:}
 \begin{lstlisting}
-// Decimal literals with separators
-type range 0 .. 1_000_000 million_t;
-type range 0 .. 1'000'000 million_alt_t;
-type range 0 .. 4_294_967_295 uint32_max_t;
-
-// Hexadecimal literals with separators
-type modular 0x8000_0000 half_max_t;
-type modular 0xFFFF_FFFF all_bits_t;
-type modular 0xDEAD_BEEF pattern_t;
-type modular 0xDEAD'BEEF pattern_alt_t;
-
-// Binary literals with separators
-type modular 0b1111_1111 byte_mask_t;
-type modular 0b1010_0101_1100_0011 pattern16_t;
-type modular 0b1111'1111 byte_alt_t;
+1_000_000        // Decimal with underscores
+1'000'000        // Decimal with apostrophes (C compatibility)
+0xDEAD_BEEF      // Hexadecimal with underscores
+0xDEAD'BEEF      // Hexadecimal with apostrophes
+0b1111_1111      // Binary with underscores
+0b1111'1111      // Binary with apostrophes
 
 // Invalid examples
-// type modular 0x8000_0'000 bad_t;  // Error: mixed separators
-// type modular 1000_ bad2_t;  // Error: trailing separator
+// 0x8000_0'000   // Error: mixed separators
+// 1000_          // Error: trailing separator
 \end{lstlisting}
 
 \subsection{Floating-Point Literals}
@@ -591,16 +582,26 @@ module hello {
 }
 \end{lstlisting}
 
-\section{Type Declarations}
+\section{Scalar Types}
 
 \subsection{Range Types}
+
+Range types define integer types with explicit minimum and maximum bounds. The compiler enforces these bounds, and runtime checks can verify that values stay within range.
+
+\textbf{Syntax:}
 \begin{lstlisting}
-module types_example {
+type range <min-expr> .. <max-expr> <type-name>;
+\end{lstlisting}
+
+\textbf{Examples:}
+\begin{lstlisting}
+module range_examples {
 
   // Integer types based on ranges
   type range 0 .. 255 byte_t;
   type range 0 .. 100 percentage_t;
   type range -273 .. 1000 temperature_t;
+  type range -32768 .. 32767 int16_t;
 
   percentage_t cpu_usage = 75;
   temperature_t room_temp = 22;
@@ -608,20 +609,68 @@ module types_example {
 }
 \end{lstlisting}
 
+Range types are ideal for:
+\begin{itemize}
+\item Values with natural limits (percentages, temperatures, indices)
+\item Representing subsets of integers with specific meaning
+\item Enabling compiler optimizations based on known bounds
+\end{itemize}
+
 \subsection{Modular Types}
+
+Modular types define unsigned integer types with wraparound arithmetic modulo a specified value. When a value exceeds the modulus, it wraps around to zero. Modular types are perfect for implementing C-style unsigned integers and bit manipulation.
+
+\textbf{Syntax:}
 \begin{lstlisting}
-// Modular arithmetic (wraps around)
-type modular 256 uint8_t;
-type modular 65536 uint16_t;
+type modular <modulus-expr> <type-name>;
+\end{lstlisting}
 
-// Alternative ways to define uint32_t (all equivalent)
-type modular 4294967296 uint32_t;      // Using decimal literal
-type modular 1 << 32 uint32_alt1_t;    // Using bit shift
-type modular 0x1_0000_0000 uint32_alt2_t;  // Using hexadecimal
+The modulus defines the range \verb'[0, modulus-1]'. Arithmetic operations wrap around automatically.
 
+\textbf{Defining C Standard Unsigned Integer Types:}
+
+\emph{stC} provides multiple equivalent ways to define standard unsigned integer types. You can use decimal literals, bit shift expressions, or exponentiation:
+
+\begin{lstlisting}
+// uint8_t: 8-bit unsigned (0..255)
+type modular 256 uint8_t;           // Using decimal literal
+type modular 1 << 8 uint8_alt_t;    // Using bit shift
+type modular 2 ** 8 uint8_alt2_t;   // Using exponentiation
+
+// uint16_t: 16-bit unsigned (0..65535)
+type modular 65536 uint16_t;        // Using decimal literal
+type modular 1 << 16 uint16_alt_t;  // Using bit shift
+type modular 2 ** 16 uint16_alt2_t; // Using exponentiation
+
+// uint32_t: 32-bit unsigned (0..4294967295)
+type modular 4294967296 uint32_t;         // Using decimal literal
+type modular 1 << 32 uint32_alt_t;        // Using bit shift
+type modular 2 ** 32 uint32_alt2_t;       // Using exponentiation
+type modular 0x1_0000_0000 uint32_alt3_t; // Using hexadecimal
+
+// uint64_t: 64-bit unsigned (0..18446744073709551615)
+type modular 1 << 64 uint64_t;        // Using bit shift (most readable)
+type modular 2 ** 64 uint64_alt_t;    // Using exponentiation
+type modular 0x1_0000_0000_0000_0000 uint64_alt2_t; // Using hexadecimal
+\end{lstlisting}
+
+\textbf{Wraparound Behavior:}
+\begin{lstlisting}
 uint8_t counter = 255;
 counter = counter + 1;  // Wraps to 0
+
+uint8_t value = 0;
+value = value - 1;      // Wraps to 255
 \end{lstlisting}
+
+Modular types are ideal for:
+\begin{itemize}
+\item Bit manipulation and bitwise operations
+\item Hardware register access
+\item Cryptography and checksums
+\item Circular buffers and wraparound counters
+\item Compatibility with C unsigned integer types
+\end{itemize}
 
 \subsection{Structure Types}
 \begin{lstlisting}
