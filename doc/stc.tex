@@ -150,10 +150,12 @@ Identifiers are case-sensitive. Examples: \verb'myVariable', \verb'Count_1', \ve
 \subsection{Integer Literals}
 \emph{stC} supports three integer literal formats:
 \begin{itemize}
-\item \textbf{Decimal}: \verb'0', \verb'42', \verb'1234'
-\item \textbf{Hexadecimal}: \verb'0x0', \verb'0x2A', \verb'0x4D2', \verb'0xDEADBEEF'
-\item \textbf{Binary}: \verb'0b0', \verb'0b101010', \verb'0b11111111'
+\item \textbf{Decimal}: \verb'0', \verb'42', \verb'1234', \verb'1_000_000'
+\item \textbf{Hexadecimal}: \verb'0x0', \verb'0x2A', \verb'0x4D2', \verb'0xDEAD_BEEF', \verb'0x8000_0000'
+\item \textbf{Binary}: \verb'0b0', \verb'0b101010', \verb'0b1111_1111', \verb'0b1010_0101'
 \end{itemize}
+
+Underscores (\verb'_') can be used as digit separators to improve readability. Underscores are allowed between digits but not at the beginning or end of a number, and not immediately after the base prefix (\verb'0x' or \verb'0b').
 
 \subsection{Floating-Point Literals}
 Floating-point literals have the form:
@@ -274,7 +276,8 @@ module stdint {
    <variable-declaration> |
    <function-declaration> |
    <foreign-variable-declaration> |
-   <foreign-function-declaration>
+   <foreign-function-declaration> |
+   <compile-if-declaration>
 
 <constant-declaration> ::=
    "const" <type-identifier> <constant-declarator> "=" <constant-expression> ";"
@@ -348,7 +351,8 @@ module stdint {
     <do-while-statement> |
     <switch-statement> |
     <statement-block> |
-    <return-statement>
+    <return-statement> |
+    <compile-if-statement>
 
 <assignment> ::= <variable-reference> "=" <expression>
 
@@ -380,6 +384,16 @@ module stdint {
 <default-case> ::= "default" ":" <statement>*
 
 <return-statement> ::= "return" (<expression>)? ";"
+
+<compile-if-statement> ::=
+   "compile_if" <constant-expression> "{"
+      <statement>*
+   "}" ("else" "{" <statement>* "}")?
+
+<compile-if-declaration> ::=
+   "compile_if" <constant-expression> "{"
+      <declaration>*
+   "}" ("else" "{" <declaration>* "}")?
 
 <param-declaration> ::=
    (<parameter-mode>)? <type-identifier> <param-declarator>
@@ -850,6 +864,50 @@ module geometry.circle {
   bool point_in_circle(in point_t p, in circle_t c) {
     return distance_squared(p, c.center) <= square(c.radius);
   }
+
+}
+\end{lstlisting}
+
+\section{Compile-Time Conditionals}
+The \verb'compile_if' statement allows for conditional compilation based on constant expressions evaluated at compile time. This is useful for platform-specific code or conditional features.
+
+\subsection{Platform-Specific Types}
+\begin{lstlisting}
+module platform_types {
+
+  // Define types based on platform word size
+  compile_if machine_width == 64 {
+    type range 0 .. (1 << 63) - 1 unsigned_long_t;
+    type range -(1 << 63) .. (1 << 63) - 1 signed_long_t;
+  } else {
+    type range 0 .. (1 << 31) - 1 unsigned_long_t;
+    type range -(1 << 31) .. (1 << 31) - 1 signed_long_t;
+  }
+
+  // Use underscores for readability in large numbers
+  compile_if machine_width >= 32 {
+    type modular 0x1_0000_0000 uint32_t;  // 4 billion
+  }
+
+}
+\end{lstlisting}
+
+\subsection{Numeric Literal Separators}
+Both underscores and apostrophes can be used as digit separators in numeric literals to improve readability:
+\begin{lstlisting}
+module numeric_separators {
+
+  // Underscore separators (C/Rust style)
+  type range 0 .. 1_000_000 million_t;
+  type modular 0x8000_0000 half_uint32_t;
+  type modular 0b1111_1111 byte_mask_t;
+
+  // Apostrophe separators (Ada style)
+  type range 0 .. 1'000'000 million_ada_t;
+  type modular 0xDEAD'BEEF hex_value_t;
+
+  // Note: A literal must use only one separator style
+  // type modular 0x8000_0'000 invalid_t;  // Error: mixed separators
 
 }
 \end{lstlisting}

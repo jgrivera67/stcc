@@ -198,6 +198,8 @@ is
    is
       Lexer_Obj : Lexer_Type renames Compiler_Obj.Lexer_Obj;
       Cursor : Token_String_Cursor_Type := 1;
+      Has_Apostrophe : Boolean := False;
+      Has_Underscore : Boolean := False;
    begin
       loop
          if Cursor > Token_Obj.String_Buffer'Length then
@@ -207,6 +209,18 @@ is
          end if;
 
          if Lexer_Obj.Lookahead_Char = ''' then
+            Has_Apostrophe := True;
+            if Has_Underscore then
+               Log_Compiler_Error (Compiler_Obj, "Mixed digit separators (' and _) not allowed in same literal");
+               raise Program_Error;
+            end if;
+            Token_Obj.String_Buffer (Cursor) := '_';
+         elsif Lexer_Obj.Lookahead_Char = '_' then
+            Has_Underscore := True;
+            if Has_Apostrophe then
+               Log_Compiler_Error (Compiler_Obj, "Mixed digit separators (' and _) not allowed in same literal");
+               raise Program_Error;
+            end if;
             Token_Obj.String_Buffer (Cursor) := '_';
          else
             Token_Obj.String_Buffer (Cursor) := Lexer_Obj.Lookahead_Char;
@@ -236,6 +250,8 @@ is
                                                Token_Obj : out Token_Type) is
       Lexer_Obj : Lexer_Type renames Compiler_Obj.Lexer_Obj;
       Cursor : Token_String_Cursor_Type := 1;
+      Has_Apostrophe : Boolean := False;
+      Has_Underscore : Boolean := False;
    begin
       if not Is_Hexadecimal_Digit (Lexer_Obj.Lookahead_Char) then
          Log_Compiler_Error (Compiler_Obj, "Expected hexadecimal digit: '" & Lexer_Obj.Lookahead_Char & "'");
@@ -250,8 +266,20 @@ is
          end if;
 
          if Lexer_Obj.Lookahead_Char = ''' then
+            Has_Apostrophe := True;
+            if Has_Underscore then
+               Log_Compiler_Error (Compiler_Obj, "Mixed digit separators (' and _) not allowed in same literal");
+               raise Program_Error;
+            end if;
             Token_Obj.String_Buffer (Cursor) := '_';
-         else
+         elsif Lexer_Obj.Lookahead_Char = '_' then
+            Has_Underscore := True;
+            if Has_Apostrophe then
+               Log_Compiler_Error (Compiler_Obj, "Mixed digit separators (' and _) not allowed in same literal");
+               raise Program_Error;
+            end if;
+            Token_Obj.String_Buffer (Cursor) := '_';
+         elsif Is_Hexadecimal_Digit (Lexer_Obj.Lookahead_Char) then
             Token_Obj.String_Buffer (Cursor) := Lexer_Obj.Lookahead_Char;
          end if;
 
@@ -274,6 +302,8 @@ is
                                           Token_Obj : out Token_Type) is
       Lexer_Obj : Lexer_Type renames Compiler_Obj.Lexer_Obj;
       Cursor : Token_String_Cursor_Type := 1;
+      Has_Apostrophe : Boolean := False;
+      Has_Underscore : Boolean := False;
    begin
       if Lexer_Obj.Lookahead_Char not in '0' .. '1' then
          Log_Compiler_Error (Compiler_Obj, "Expected binary digit: '" & Lexer_Obj.Lookahead_Char & "'");
@@ -288,6 +318,18 @@ is
          end if;
 
          if Lexer_Obj.Lookahead_Char = ''' then
+            Has_Apostrophe := True;
+            if Has_Underscore then
+               Log_Compiler_Error (Compiler_Obj, "Mixed digit separators (' and _) not allowed in same literal");
+               raise Program_Error;
+            end if;
+            Token_Obj.String_Buffer (Cursor) := '_';
+         elsif Lexer_Obj.Lookahead_Char = '_' then
+            Has_Underscore := True;
+            if Has_Apostrophe then
+               Log_Compiler_Error (Compiler_Obj, "Mixed digit separators (' and _) not allowed in same literal");
+               raise Program_Error;
+            end if;
             Token_Obj.String_Buffer (Cursor) := '_';
          else
             Token_Obj.String_Buffer (Cursor) := Lexer_Obj.Lookahead_Char;

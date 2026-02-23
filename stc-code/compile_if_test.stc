@@ -1,0 +1,35 @@
+//
+//  Test file for compile_if conditional compilation
+//
+//  This file tests:
+//  - compile_if with machine_width
+//  - Numeric literal separators (underscores and apostrophes)
+//  - Platform-specific type definitions
+//
+
+module compile_if_test {
+
+  // Define platform-specific pointer type
+  compile_if machine_width == 64 {
+    type modular 1 << 64 address_t;
+    type range 0 .. (1 << 63) - 1 unsigned_long_t;
+  } else {
+    type modular 1 << 32 address_t;
+    type range 0 .. (1 << 31) - 1 unsigned_long_t;
+  }
+
+  // Test underscores in numeric literals
+  type range 0 .. 1_000_000 million_t;
+  type modular 0x8000_0000 half_uint32_t;
+  type modular 0b1111_1111 byte_mask_t;
+
+  // Test apostrophes in numeric literals (Ada style)
+  type range 0 .. 1'000'000 million_ada_t;
+  type modular 0xDEAD'BEEF hex_value_t;
+
+  // Conditional feature flag
+  compile_if machine_width >= 32 {
+    type modular 0x1_0000_0000 uint32_t;
+  }
+
+}
