@@ -1,0 +1,41 @@
+//
+//  Test file for subtype declarations
+//
+//  This file tests:
+//  - Subtype declarations with range constraints
+//  - Subtypes of subtypes (transitive relationship)
+//  - Natural numbers, positive numbers, percentages
+//
+
+module subtypes_test {
+
+  // Base signed integer type
+  type range -2147483648 .. 2147483647 int_t;
+
+  // Natural numbers as a subtype of int_t (non-negative integers)
+  subtype int_t range 0 .. 2147483647 natural_t;
+
+  // Positive numbers as a subtype of int_t
+  subtype int_t range 1 .. 2147483647 positive_t;
+
+  // Percentage as a subtype of natural_t (subtype of a subtype)
+  subtype natural_t range 0 .. 100 percentage_t;
+
+  // Index types for array bounds
+  subtype natural_t range 0 .. 255 byte_index_t;
+  subtype natural_t range 0 .. 65535 word_index_t;
+
+  // Temperature in Celsius (can be negative)
+  type range -273 .. 1000 celsius_t;
+
+  // Temperature in Kelvin (subtype with only non-negative values)
+  subtype celsius_t range 0 .. 1273 kelvin_t;
+
+  // Age with realistic bounds
+  subtype natural_t range 0 .. 150 age_t;
+
+  // Count types for different scenarios
+  subtype natural_t range 0 .. 1000000 large_count_t;
+  subtype positive_t range 1 .. 100 small_positive_t;
+
+}

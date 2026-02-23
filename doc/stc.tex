@@ -289,6 +289,7 @@ module stdint {
 <declaration> ::=
    <constant-declaration> |
    <type-declaration> |
+   <subtype-declaration> |
    <variable-declaration> |
    <function-declaration> |
    <foreign-variable-declaration> |
@@ -307,7 +308,14 @@ module stdint {
 <type-declaration> ::=
    "type" <type-declarator> <type-identifier> (<type-attributes>)? ";"
 
+<subtype-declaration> ::=
+   "subtype" <type-identifier> "range" <constant-integer-expression>
+      ".." <constant-integer-expression> <subtype-identifier>
+      (<type-attributes>)? ";"
+
 <type-identifier> ::= "<identifier>"
+
+<subtype-identifier> ::= "<identifier>"
 
 <type-declarator> ::=
    "range" <constant-integer-expression> ".." <constant-integer-expression> |
@@ -595,18 +603,14 @@ type range <min-expr> .. <max-expr> <type-name>;
 
 \textbf{Examples:}
 \begin{lstlisting}
-module range_examples {
+// Integer types based on ranges
+type range 0 .. 255 byte_t;
+type range 0 .. 100 percentage_t;
+type range -273 .. 1000 temperature_t;
+type range -32768 .. 32767 int16_t;
 
-  // Integer types based on ranges
-  type range 0 .. 255 byte_t;
-  type range 0 .. 100 percentage_t;
-  type range -273 .. 1000 temperature_t;
-  type range -32768 .. 32767 int16_t;
-
-  percentage_t cpu_usage = 75;
-  temperature_t room_temp = 22;
-
-}
+percentage_t cpu_usage = 75;
+temperature_t room_temp = 22;
 \end{lstlisting}
 
 Range types are ideal for:
@@ -633,25 +637,23 @@ The modulus defines the range \verb'[0, modulus-1]'. Arithmetic operations wrap 
 
 \begin{lstlisting}
 // uint8_t: 8-bit unsigned (0..255)
-type modular 256 uint8_t;           // Using decimal literal
-type modular 1 << 8 uint8_alt_t;    // Using bit shift
-type modular 2 ** 8 uint8_alt2_t;   // Using exponentiation
+type modular 256 uint8_t;      // Using decimal literal
+type modular 1 << 8 uint8_t    // Using bit shift
+type modular 2 ** 8 uint8_t;   // Using exponentiation
 
 // uint16_t: 16-bit unsigned (0..65535)
-type modular 65536 uint16_t;        // Using decimal literal
-type modular 1 << 16 uint16_alt_t;  // Using bit shift
-type modular 2 ** 16 uint16_alt2_t; // Using exponentiation
+type modular 65_536 uint16_t;  // Using decimal literal
+type modular 1 << 16 uint16_t; // Using bit shift
+type modular 2 ** 16 uint16_t; // Using exponentiation
 
 // uint32_t: 32-bit unsigned (0..4294967295)
-type modular 4294967296 uint32_t;         // Using decimal literal
-type modular 1 << 32 uint32_alt_t;        // Using bit shift
-type modular 2 ** 32 uint32_alt2_t;       // Using exponentiation
-type modular 0x1_0000_0000 uint32_alt3_t; // Using hexadecimal
+type modular 4_294_967_296 uint32_t; // Using decimal literal
+type modular 1 << 32 uint32_t;       // Using bit shift
+type modular 2 ** 32 uint32_t;       // Using exponentiation
 
 // uint64_t: 64-bit unsigned (0..18446744073709551615)
-type modular 1 << 64 uint64_t;        // Using bit shift (most readable)
-type modular 2 ** 64 uint64_alt_t;    // Using exponentiation
-type modular 0x1_0000_0000_0000_0000 uint64_alt2_t; // Using hexadecimal
+type modular 1 << 64 uint64_t;    // Using bit shift (most readable)
+type modular 2 ** 64 uint64_t;    // Using exponentiation
 \end{lstlisting}
 
 \textbf{Wraparound Behavior:}
@@ -670,6 +672,49 @@ Modular types are ideal for:
 \item Cryptography and checksums
 \item Circular buffers and wraparound counters
 \item Compatibility with C unsigned integer types
+\end{itemize}
+
+\subsection{Subtypes}
+
+Subtypes allow you to define constrained versions of existing types. A subtype is compatible with its base type but has additional range constraints. This is particularly useful for creating semantically meaningful types that share the same underlying representation.
+
+\textbf{Syntax:}
+\begin{lstlisting}
+subtype <base-type> range <min-expr> .. <max-expr> <subtype-name>;
+\end{lstlisting}
+
+\textbf{Examples:}
+\begin{lstlisting}
+// Define base signed integer type
+type range -2147483648 .. 2147483647 int_t;
+
+// Natural numbers as a subtype of int_t (non-negative integers)
+subtype int_t range 0 .. 2147483647 natural_t;
+
+// Positive numbers as a subtype of int_t
+subtype int_t range 1 .. 2147483647 positive_t;
+
+// Percentage as a subtype of natural_t
+subtype natural_t range 0 .. 100 percentage_t;
+
+// Usage
+int_t temperature = -10;      // Can be negative
+natural_t count = 42;          // Cannot be negative
+positive_t items = 1;          // Must be at least 1
+percentage_t progress = 75;    // Limited to 0..100
+
+// Subtype values are compatible with base type
+int_t x = count;               // OK: natural_t is a subtype of int_t
+natural_t y = temperature;     // Runtime check: may fail if negative
+\end{lstlisting}
+
+Key characteristics:
+\begin{itemize}
+\item Subtypes are compatible with their base type
+\item Values can be assigned between base type and subtype (with runtime checks)
+\item Subtypes inherit operations from their base type
+\item Subtype ranges must be within the base type's range
+\item Subtypes can be derived from other subtypes (transitive relationship)
 \end{itemize}
 
 \subsection{Structure Types}
@@ -717,25 +762,19 @@ color_t my_color = red;
 
 \section{Arrays}
 \begin{lstlisting}
-module array_example {
+type range 0 .. 99 index_t;
+index_t[100] numbers;
+numbers[0] = 42;
 
-  type range 0 .. 99 index_t;
-  index_t[100] numbers;
-  numbers[0] = 42;
-
-  // Multi-dimensional arrays
-  index_t[10][10] m;
-  m[0][0] = 1;
-
-}
+// Multi-dimensional arrays
+index_t[10][10] m;
+m[0][0] = 1;
 \end{lstlisting}
 
 \section{Functions}
 
 \subsection{Simple Function}
 \begin{lstlisting}
-type range -2147483648 .. 2147483647 int_t;
-
 int_t add(in int_t a, in int_t b) {
   return a + b;
 }
@@ -743,9 +782,10 @@ int_t add(in int_t a, in int_t b) {
 
 \subsection{Function with Contracts}
 \begin{lstlisting}
-type range 0 .. 2147483647 natural_t;
+type range -2147483648 .. 2147483647 int_t;
+subtype int_t range 0 .. 2147483647 natural_t;
 
-natural_t divide(in natural_t a, in natural_t b)
+natural_t divide(in natural_t a, in int_t b)
     pre(b != 0)
     post(result * b <= a && result * b + b > a)
 {

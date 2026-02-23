@@ -403,6 +403,45 @@ package body STC_Compiler.Parser is
       Expect_Token (Compiler_Obj, Semicolon_Token);
    end Parse_Type_Declaration;
 
+   procedure Parse_Subtype_Declaration (Compiler_Obj : in out Compiler_Type;
+                                        Subtype_Node : out AST_Node_Pointer_Type) is
+      Parser_Obj : Parser_Type renames Compiler_Obj.Parser_Obj;
+   begin
+      Subtype_Node := new AST_Node_Type (AST_Type_Declaration_Node);
+      Lexer.Get_Next_Token (Compiler_Obj);  --  Skip 'subtype'
+
+      --  Parse base type identifier
+      if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /= Identifier_Token then
+         Log_Compiler_Error (Compiler_Obj, "Expected base type identifier");
+         raise Program_Error;
+      end if;
+      --  TODO: Store base type name
+      Lexer.Get_Next_Token (Compiler_Obj);
+
+      --  Expect 'range' keyword
+      if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /= Range_Token then
+         Log_Compiler_Error (Compiler_Obj, "Expected 'range' keyword in subtype declaration");
+         raise Program_Error;
+      end if;
+      Lexer.Get_Next_Token (Compiler_Obj);
+
+      --  Parse range bounds
+      Parse_Expression (Compiler_Obj);
+      Expect_Token (Compiler_Obj, Range_Op_Token);
+      Parse_Expression (Compiler_Obj);
+      --  TODO: Create subtype range node
+
+      --  Get subtype name
+      if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /= Identifier_Token then
+         Log_Compiler_Error (Compiler_Obj, "Expected subtype name");
+         raise Program_Error;
+      end if;
+      --  TODO: Store subtype name
+      Lexer.Get_Next_Token (Compiler_Obj);
+
+      Expect_Token (Compiler_Obj, Semicolon_Token);
+   end Parse_Subtype_Declaration;
+
    procedure Parse_Declaration (Compiler_Obj : in out Compiler_Type;
                                Declaration_Node : out AST_Node_Pointer_Type) is
       Parser_Obj : Parser_Type renames Compiler_Obj.Parser_Obj;
@@ -412,6 +451,9 @@ package body STC_Compiler.Parser is
       case Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind is
          when Type_Token =>
             Parse_Type_Declaration (Compiler_Obj, Declaration_Node);
+
+         when Subtype_Token =>
+            Parse_Subtype_Declaration (Compiler_Obj, Declaration_Node);
 
          when Const_Token =>
             --  TODO: Parse constant declaration
@@ -724,7 +766,8 @@ package body STC_Compiler.Parser is
                Previous_Token_Obj.Is_Operator or else
                Previous_Token_Obj.Kind = Left_Parenthesis_Token or else
                Previous_Token_Obj.Kind = Comma_Token or else
-               Previous_Token_Obj.Kind = Semicolon_Token;
+               Previous_Token_Obj.Kind = Semicolon_Token or else
+               Previous_Token_Obj.Kind = Range_Token;
          begin
             case Current_Token_Obj.Kind is
                when Identifier_Token =>
