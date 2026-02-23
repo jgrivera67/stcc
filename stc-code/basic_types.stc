@@ -52,7 +52,7 @@ module basic_types {
   // Nested structures with pointers
   type struct {
     uint32_t data;
-    struct node_t* next;
+    node_t* next;
   } node_t;
 
   type struct {

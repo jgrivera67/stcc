@@ -613,7 +613,11 @@ module types_example {
 // Modular arithmetic (wraps around)
 type modular 256 uint8_t;
 type modular 65536 uint16_t;
-type modular 4294967296 uint32_t;
+
+// Alternative ways to define uint32_t (all equivalent)
+type modular 4294967296 uint32_t;      // Using decimal literal
+type modular 1 << 32 uint32_alt1_t;    // Using bit shift
+type modular 0x1_0000_0000 uint32_alt2_t;  // Using hexadecimal
 
 uint8_t counter = 255;
 counter = counter + 1;  // Wraps to 0

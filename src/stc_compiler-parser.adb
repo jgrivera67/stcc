@@ -311,14 +311,80 @@ package body STC_Compiler.Parser is
             --  Struct or union type: type struct { ... } Foo;
             Lexer.Get_Next_Token (Compiler_Obj);
             Expect_Token (Compiler_Obj, Left_Curly_Brace_Token);
-            --  TODO: Parse field declarations
+
+            --  Parse field declarations: (<type-id> ["*"] <field-id> ["[" expr "]"]* ["=" expr] ";")+
+            loop
+               exit when Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Right_Curly_Brace_Token;
+
+               --  Parse type identifier
+               if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /= Identifier_Token then
+                  Log_Compiler_Error (Compiler_Obj, "Expected type identifier in struct/union field");
+                  raise Program_Error;
+               end if;
+               --  TODO: Store field type
+               Lexer.Get_Next_Token (Compiler_Obj);
+
+               --  Check for optional pointer "*"
+               if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Asterisk_Op_Token then
+                  --  TODO: Mark as pointer field
+                  Lexer.Get_Next_Token (Compiler_Obj);
+               end if;
+
+               --  Parse field identifier
+               if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /= Identifier_Token then
+                  Log_Compiler_Error (Compiler_Obj, "Expected field identifier");
+                  raise Program_Error;
+               end if;
+               --  TODO: Store field name
+               Lexer.Get_Next_Token (Compiler_Obj);
+
+               --  Parse optional array dimensions "[" expr "]"*
+               while Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Left_Square_Parenthesis_Token loop
+                  Lexer.Get_Next_Token (Compiler_Obj);
+                  Parse_Expression (Compiler_Obj);
+                  Expect_Token (Compiler_Obj, Right_Square_Parenthesis_Token);
+                  --  TODO: Store array dimension
+               end loop;
+
+               --  Parse optional default value "= <constant-expression>"
+               if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Assignment_Op_Token then
+                  Lexer.Get_Next_Token (Compiler_Obj);
+                  Parse_Expression (Compiler_Obj);
+                  --  TODO: Store default value
+               end if;
+
+               Expect_Token (Compiler_Obj, Semicolon_Token);
+            end loop;
+
             Expect_Token (Compiler_Obj, Right_Curly_Brace_Token);
 
          when Enum_Token =>
             --  Enum type: type enum { ... } Foo;
             Lexer.Get_Next_Token (Compiler_Obj);
             Expect_Token (Compiler_Obj, Left_Curly_Brace_Token);
-            --  TODO: Parse enum entries
+
+            --  Parse enum entries: identifier ("=" expr)? ("," identifier ("=" expr)?)*
+            loop
+               --  Parse enum entry identifier
+               if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /= Identifier_Token then
+                  Log_Compiler_Error (Compiler_Obj, "Expected enum entry identifier");
+                  raise Program_Error;
+               end if;
+               --  TODO: Store enum entry name
+               Lexer.Get_Next_Token (Compiler_Obj);
+
+               --  Check for optional "= <constant-expression>"
+               if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Assignment_Op_Token then
+                  Lexer.Get_Next_Token (Compiler_Obj);
+                  Parse_Expression (Compiler_Obj);
+                  --  TODO: Store enum entry value expression
+               end if;
+
+               --  Check for comma (more entries) or closing brace (end of enum)
+               exit when Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /= Comma_Token;
+               Lexer.Get_Next_Token (Compiler_Obj);  --  Skip comma
+            end loop;
+
             Expect_Token (Compiler_Obj, Right_Curly_Brace_Token);
 
          when others =>
