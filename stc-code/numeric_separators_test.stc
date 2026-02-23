@@ -1,0 +1,30 @@
+//
+//  Test file for numeric literal separators
+//
+//  This file tests:
+//  - Numeric literal separators (underscores and apostrophes)
+//  - Both C++14+ style (apostrophes) and Python/Rust style (underscores)
+//
+//  Note: compile_if is documented in the grammar but not yet
+//  implemented in the parser. Future version will add:
+//  - compile_if with machine_width for platform-specific types
+//
+
+module numeric_separators_test {
+
+  // Test underscores in numeric literals (Python/Rust style)
+  type range 0 .. 1_000_000 million_t;
+  type modular 0x8000_0000 half_uint32_t;
+  type modular 0b1111_1111 byte_mask_t;
+
+  // Test apostrophes in numeric literals (C++14+ style)
+  type range 0 .. 1'000'000 million_cpp_t;
+  type modular 0xDEAD'BEEF hex_value_t;
+
+  // Platform-specific pointer type using machine_width
+  type modular 1 << machine_width address_t;
+
+  // Large numbers are easier to read with separators
+  type modular 0x1_0000_0000 four_billion_t;
+
+}

@@ -155,7 +155,44 @@ Identifiers are case-sensitive. Examples: \verb'myVariable', \verb'Count_1', \ve
 \item \textbf{Binary}: \verb'0b0', \verb'0b101010', \verb'0b1111_1111', \verb'0b1010_0101'
 \end{itemize}
 
-Underscores (\verb'_') can be used as digit separators to improve readability. Underscores are allowed between digits but not at the beginning or end of a number, and not immediately after the base prefix (\verb'0x' or \verb'0b').
+Both underscores (\verb'_') and apostrophes (\verb''') can be used as digit separators to improve readability:
+\begin{itemize}
+\item \textbf{Underscore style}: \verb'1_000_000', \verb'0xDEAD_BEEF' (Python/Rust style)
+\item \textbf{Apostrophe style}: \verb'1'000'000', \verb'0xDEAD'BEEF' (C++14+ style)
+\end{itemize}
+
+Separators are allowed between digits but not at the beginning or end of a number, and not immediately after the base prefix (\verb'0x' or \verb'0b'). A literal must use only one separator style - mixing \verb'_' and \verb''' in the same literal is an error.
+
+\textbf{Examples:}
+\begin{lstlisting}
+// Decimal with underscores
+type range 0 .. 1_000_000 million_t;
+type range 0 .. 4_294_967_295 uint32_max_t;
+
+// Decimal with apostrophes (C++14+ style)
+type range 0 .. 1'000'000 million_cpp_t;
+type range 0 .. 4'294'967'295 uint32_max_cpp_t;
+
+// Hexadecimal with underscores
+type modular 0x8000_0000 half_max_t;
+type modular 0xFFFF_FFFF uint32_all_bits_t;
+type modular 0xDEAD_BEEF hex_pattern_t;
+
+// Hexadecimal with apostrophes
+type modular 0x8000'0000 half_max_cpp_t;
+type modular 0xFFFF'FFFF uint32_all_bits_cpp_t;
+
+// Binary with underscores
+type modular 0b1111_1111 byte_mask_t;
+type modular 0b1010_0101_1100_0011 pattern_t;
+
+// Binary with apostrophes
+type modular 0b1111'1111 byte_mask_cpp_t;
+type modular 0b1010'0101'1100'0011 pattern_cpp_t;
+
+// Invalid - mixed separators
+// type modular 0x8000_0'000 invalid_t;  // Error!
+\end{lstlisting}
 
 \subsection{Floating-Point Literals}
 Floating-point literals have the form:
@@ -897,13 +934,13 @@ Both underscores and apostrophes can be used as digit separators in numeric lite
 \begin{lstlisting}
 module numeric_separators {
 
-  // Underscore separators (C/Rust style)
+  // Underscore separators (Python/Rust style)
   type range 0 .. 1_000_000 million_t;
   type modular 0x8000_0000 half_uint32_t;
   type modular 0b1111_1111 byte_mask_t;
 
-  // Apostrophe separators (Ada style)
-  type range 0 .. 1'000'000 million_ada_t;
+  // Apostrophe separators (C++14+ style)
+  type range 0 .. 1'000'000 million_cpp_t;
   type modular 0xDEAD'BEEF hex_value_t;
 
   // Note: A literal must use only one separator style
