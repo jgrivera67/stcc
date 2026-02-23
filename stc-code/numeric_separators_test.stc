@@ -3,7 +3,7 @@
 //
 //  This file tests:
 //  - Numeric literal separators (underscores and apostrophes)
-//  - Both C++14+ style (apostrophes) and Python/Rust style (underscores)
+//  - Apostrophes are supported for compatibility with C
 //
 //  Note: compile_if is documented in the grammar but not yet
 //  implemented in the parser. Future version will add:
@@ -12,12 +12,12 @@
 
 module numeric_separators_test {
 
-  // Test underscores in numeric literals (Python/Rust style)
+  // Test underscores in numeric literals
   type range 0 .. 1_000_000 million_t;
   type modular 0x8000_0000 half_uint32_t;
   type modular 0b1111_1111 byte_mask_t;
 
-  // Test apostrophes in numeric literals (C++14+ style)
+  // Test apostrophes in numeric literals (for C compatibility)
   type range 0 .. 1'000'000 million_cpp_t;
   type modular 0xDEAD'BEEF hex_value_t;
 
