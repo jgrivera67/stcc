@@ -1,0 +1,177 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "stC",
+  "scopeName": "source.stc",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#keywords" },
+    { "include": "#strings" },
+    { "include": "#characters" },
+    { "include": "#numbers" },
+    { "include": "#types" },
+    { "include": "#constants" },
+    { "include": "#operators" },
+    { "include": "#functions" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.stc",
+          "match": "//.*$"
+        },
+        {
+          "name": "comment.block.stc",
+          "begin": "/\\*",
+          "end": "\\*/"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.stc",
+          "match": "\\b(if|else|while|for|do|switch|case|default|break|continue|return|goto)\\b"
+        },
+        {
+          "name": "keyword.other.stc",
+          "match": "\\b(module|import|type|subtype|const|foreign|private|packed|volatile|static|auto|sizeof)\\b"
+        },
+        {
+          "name": "keyword.type.stc",
+          "match": "\\b(range|modular|struct|union|enum)\\b"
+        },
+        {
+          "name": "keyword.parameter.stc",
+          "match": "\\b(in|out|inout)\\b"
+        },
+        {
+          "name": "keyword.contract.stc",
+          "match": "\\b(pre|post|invariant|assert)\\b"
+        },
+        {
+          "name": "keyword.other.compile-time.stc",
+          "match": "\\b(compile_if|convention|renames|as|lambda|size)\\b"
+        }
+      ]
+    },
+    "types": {
+      "patterns": [
+        {
+          "name": "storage.type.primitive.stc",
+          "match": "\\b(void|bool|char)\\b"
+        },
+        {
+          "name": "storage.type.stc",
+          "match": "\\b([a-z_][a-z0-9_]*_t)\\b"
+        }
+      ]
+    },
+    "constants": {
+      "patterns": [
+        {
+          "name": "constant.language.stc",
+          "match": "\\b(true|false|null)\\b"
+        },
+        {
+          "name": "constant.language.builtin.stc",
+          "match": "\\b(machine_width)\\b"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.stc",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.stc",
+              "match": "\\\\(n|t|r|\\\\|\"|'|0)"
+            }
+          ]
+        }
+      ]
+    },
+    "characters": {
+      "patterns": [
+        {
+          "name": "string.quoted.single.stc",
+          "begin": "'",
+          "end": "'",
+          "patterns": [
+            {
+              "name": "constant.character.escape.stc",
+              "match": "\\\\(n|t|r|\\\\|\"|'|0)"
+            }
+          ]
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.hex.stc",
+          "match": "\\b0x[0-9a-fA-F][0-9a-fA-F_']*\\b"
+        },
+        {
+          "name": "constant.numeric.binary.stc",
+          "match": "\\b0b[01][01_']*\\b"
+        },
+        {
+          "name": "constant.numeric.float.stc",
+          "match": "\\b\\d+\\.\\d+([eE][+-]?\\d+)?\\b"
+        },
+        {
+          "name": "constant.numeric.decimal.stc",
+          "match": "\\b\\d[\\d_']*\\b"
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.range.stc",
+          "match": "\\.\\."
+        },
+        {
+          "name": "keyword.operator.arrow.stc",
+          "match": "->"
+        },
+        {
+          "name": "keyword.operator.comparison.stc",
+          "match": "(==|!=|<=|>=|<|>)"
+        },
+        {
+          "name": "keyword.operator.logical.stc",
+          "match": "(&&|\\|\\||!)"
+        },
+        {
+          "name": "keyword.operator.bitwise.stc",
+          "match": "(&|\\||\\^|~|<<|>>)"
+        },
+        {
+          "name": "keyword.operator.arithmetic.stc",
+          "match": "(\\+|-|\\*|/|%|\\*\\*)"
+        },
+        {
+          "name": "keyword.operator.assignment.stc",
+          "match": "(=|\\+=|-=|\\*=|/=|%=|&=|\\|=|\\^=|<<=|>>=)"
+        },
+        {
+          "name": "keyword.operator.ternary.stc",
+          "match": "(\\?|:)"
+        }
+      ]
+    },
+    "functions": {
+      "patterns": [
+        {
+          "name": "entity.name.function.stc",
+          "match": "\\b([a-z_][a-z0-9_]*)\\s*(?=\\()"
+        }
+      ]
+    }
+  }
+}

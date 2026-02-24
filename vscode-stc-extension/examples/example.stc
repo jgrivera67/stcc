@@ -1,0 +1,52 @@
+//
+// Example stC file demonstrating syntax highlighting
+//
+
+module example {
+
+  // Type declarations with range constraints
+  type range 0 .. 255 byte_t;
+  type range -2147483648 .. 2147483647 int_t;
+
+  // Subtype declaration
+  subtype int_t range 0 .. 2147483647 natural_t;
+  subtype natural_t range 0 .. 100 percentage_t;
+
+  // Modular types
+  type modular 256 uint8_t;
+  type modular 1 << 16 uint16_t;
+  type modular 2 ** 32 uint32_t;
+
+  // Enum type
+  type enum {
+    red,
+    green = 10,
+    blue
+  } color_t;
+
+  // Struct type
+  type struct {
+    byte_t x;
+    byte_t y;
+    color_t color;
+  } point_t;
+
+  // Function with contracts
+  natural_t add(in natural_t a, in natural_t b)
+    pre(a + b <= 2147483647)
+    post(result == a + b)
+  {
+    return a + b;
+  }
+
+  // Constants and literals
+  const uint8_t MAX_COUNT = 255;
+  const uint16_t BIG_NUMBER = 0xDEAD_BEEF;
+  const byte_t FLAGS = 0b1111_1111;
+
+  private
+
+  // Private declarations
+  type modular 1024 buffer_size_t;
+
+}

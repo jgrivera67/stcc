@@ -1,0 +1,101 @@
+{
+  "name": "stc-language",
+  "displayName": "stC Language Support",
+  "description": "Language support for Strong-Typed C (stC)",
+  "version": "0.1.0",
+  "publisher": "stc-lang",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "keywords": [
+    "stC",
+    "Strong-Typed C",
+    "systems programming"
+  ],
+  "main": "./out/client/src/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "stc",
+        "aliases": [
+          "stC",
+          "Strong-Typed C"
+        ],
+        "extensions": [
+          ".stc"
+        ],
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./icons/stc-icon.png",
+          "dark": "./icons/stc-icon.png"
+        }
+      }
+    ],
+    "grammars": [
+      {
+        "language": "stc",
+        "scopeName": "source.stc",
+        "path": "./syntaxes/stc.tmLanguage.json"
+      }
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "stC Language Server",
+      "properties": {
+        "stc.compilerPath": {
+          "type": "string",
+          "default": "/home/josegrivera/my-projects/stcc/bin/stcc",
+          "description": "Path to the stC compiler (stcc)"
+        },
+        "stc.trace.server": {
+          "type": "string",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "default": "off",
+          "description": "Traces the communication between VS Code and the language server."
+        },
+        "stc.validationMode": {
+          "type": "string",
+          "enum": [
+            "realtime",
+            "onSave"
+          ],
+          "default": "realtime",
+          "description": "When to validate stC files: 'realtime' validates as you type (with debouncing), 'onSave' validates only when you save the file."
+        },
+        "stc.validationDelay": {
+          "type": "number",
+          "default": 500,
+          "minimum": 0,
+          "maximum": 5000,
+          "description": "Delay in milliseconds before validating after you stop typing (only applies in realtime mode). Default is 500ms."
+        }
+      }
+    }
+  },
+  "activationEvents": [
+    "onLanguage:stc"
+  ],
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -b",
+    "watch": "tsc -b -w",
+    "postinstall": "cd client && npm install && cd ../server && npm install && cd .."
+  },
+  "devDependencies": {
+    "@types/node": "^18.0.0",
+    "@types/vscode": "^1.75.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1",
+    "vscode-languageserver": "^9.0.1",
+    "vscode-languageserver-textdocument": "^1.0.12"
+  }
+}
