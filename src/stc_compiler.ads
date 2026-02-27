@@ -19,6 +19,7 @@ private
 
    type Token_Kind_Type is (
       Ampersand_Op_Token,
+      Apostrophe_Op_Token,
       Arrow_Op_Token,
       As_Token,
       Assert_Token,
@@ -63,9 +64,11 @@ private
       Enum_Token,
       Equality_Op_Token,
       False_Token,
+      First_Token,
       Floating_Point_Literal_Token,
       For_Token,
       Foreign_Token,
+      Global_Token,
       Goto_Token,
       Greater_Than_Op_Token,
       Greater_Than_Or_Equal_Op_Token,
@@ -75,8 +78,10 @@ private
       Import_Token,
       In_Token,
       Inout_Token,
-      Invariant_Token,
       Lambda_Token,
+      Last_Token,
+      Loop_Invariant_Token,
+      Loop_Variant_Token,
       Left_Curly_Brace_Token,
       Left_Parenthesis_Token,
       Left_Square_Parenthesis_Token,
@@ -103,6 +108,7 @@ private
       Question_Mark_Token,
       Range_Token,
       Range_Op_Token,
+      Reads_Token,
       Renames_Token,
       Return_Token,
       Right_Curly_Brace_Token,
@@ -119,11 +125,13 @@ private
       Switch_Token,
       True_Token,
       Type_Token,
+      Type_Invariant_Token,
       Union_Token,
       Unit_Token,
       Void_Token,
       Volatile_Token,
       While_Token,
+      Writes_Token,
 
       Invalid_Token
    );
@@ -139,6 +147,9 @@ private
       --  Buffer to gather next token string from the input file
       String_Buffer : String (1 .. Lexical_Unit_String_Max_Size) := [others => ASCII.NUL];
       String_Length : Token_String_Length_Type := 0;
+      --  Location where this token was found
+      Line_Number : Positive := 1;
+      Column_Number : Positive := 1;
    end record;
 
    -----------------------------
@@ -198,6 +209,7 @@ private
       AST_Function_Call_Node,
       AST_Function_Declaration_Node,
       AST_Functional_If_Else_Node,
+      AST_Global_Contract_Node,
       AST_If_Node,
       AST_Literal_Node,
       AST_Statement_Block_Node,
@@ -248,6 +260,11 @@ private
       AST_Struct_Field_Op,
       AST_Struct_Pointer_Field_Dereference_Op,
       AST_Type_Cast_Op,
+      --  Attribute operators (applied with ' operator)
+      AST_First_Attribute_Op,
+      AST_Last_Attribute_Op,
+      AST_Range_Attribute_Op,
+      AST_Size_Attribute_Op,
 
       AST_Invalid_Op
    );
@@ -297,10 +314,17 @@ private
             Return_Type : AST_Node_Pointer_Type := null;
             First_Parameter : AST_Node_Pointer_Type := null;
             Function_Body : AST_Node_Pointer_Type := null;
+            --  Contract clauses
+            Precondition : AST_Node_Pointer_Type := null;
+            Postcondition : AST_Node_Pointer_Type := null;
+            First_Global_Clause : AST_Node_Pointer_Type := null;  --  Linked list of Global_Contract_Node
          when AST_Functional_If_Else_Node =>
             Functional_If_Condition : AST_Node_Pointer_Type := null;
             Functional_If_True_Operand : AST_Node_Pointer_Type := null;
             Functional_If_False_Operand : AST_Node_Pointer_Type := null;
+         when AST_Global_Contract_Node =>
+            Is_Reads : Boolean := False;  --  True for reads, False for writes
+            First_Global_Variable : Identifier_Pointer_Type := null;  --  Linked via Identifier.Next
          when AST_If_Node =>
             If_Condition : AST_Node_Pointer_Type := null;
             Then_Body : AST_Node_Pointer_Type := null;
@@ -386,6 +410,11 @@ private
    procedure Log_Message (Message : String);
 
    procedure Log_Compiler_Error (Compiler_Obj : Compiler_Type; Message : String)
+      with Pre => Compiler_Obj.Initialized;
+
+   procedure Log_Compiler_Error (Compiler_Obj : Compiler_Type;
+                                 Token : Token_Type;
+                                 Message : String)
       with Pre => Compiler_Obj.Initialized;
 
    function Get_Currrent_Token_Kind (Compiler_Obj : Compiler_Type) return Token_Kind_Type is

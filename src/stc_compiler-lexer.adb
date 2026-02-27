@@ -5,6 +5,8 @@
 --  SPDX-License-Identifier: Apache-2.0
 --
 with Ada.Characters.Handling;
+with Ada.Text_IO;
+with Ada.Strings.Fixed;
 
 package body STC_Compiler.Lexer with
    SPARK_Mode => Off
@@ -51,6 +53,7 @@ is
       while Is_Separator_Char (Lexer_Obj.Lookahead_Char) loop
          if Lexer_Obj.Lookahead_Char = ASCII.LF then
             Lexer_Obj.Line_Number := @ + 1;
+            Lexer_Obj.Column_Number := 0;  -- Reset column; Get_Next_Char will increment to 1
          end if;
 
          Get_Next_Char (Compiler_Obj);
@@ -145,17 +148,14 @@ is
                                 Token_Obj : out Token_Type) is
       Lexer_Obj : Lexer_Type renames Compiler_Obj.Lexer_Obj;
    begin
-      --  Skip the rest of the line
+      --  Skip to end of current line
       if not Ada.Text_IO.End_Of_File (Compiler_Obj.File_Obj) then
          Ada.Text_IO.Skip_Line (Compiler_Obj.File_Obj);
          Lexer_Obj.Line_Number := @ + 1;
-         Lexer_Obj.Column_Number := 1;
-         --  Read first character of next line
-         if not Ada.Text_IO.End_Of_File (Compiler_Obj.File_Obj) then
-            Ada.Text_IO.Get (Compiler_Obj.File_Obj, Lexer_Obj.Lookahead_Char);
-         else
-            Lexer_Obj.Lookahead_Char := ASCII.NUL;
-         end if;
+         Lexer_Obj.Column_Number := 0;
+
+         --  Read first character of next line using Get_Next_Char for consistency
+         Get_Next_Char (Compiler_Obj);  -- This will increment column to 1
       end if;
 
       Token_Obj.String_Length := 0;
@@ -357,13 +357,49 @@ is
       Token_Obj.Kind := Invalid_Token;
       Token_Obj.Is_Operator := False;
       Skip_Separators (Compiler_Obj);
+
+      --  Capture token location after skipping whitespace/comments
+      Token_Obj.Line_Number := Lexer_Obj.Line_Number;
+      Token_Obj.Column_Number := Lexer_Obj.Column_Number;
+
       if Ada.Characters.Handling.Is_Letter (Lexer_Obj.Lookahead_Char) then
          Scan_Identifier_Or_Reserved_Word (Compiler_Obj, Token_Obj);
       else
          case Lexer_Obj.Lookahead_Char is
             when ''' =>
-               Get_Next_Char (Compiler_Obj);
-               Scan_Character_Literal (Compiler_Obj, Token_Obj);
+               --  Could be character literal 'x' or apostrophe operator (for attributes)
+               --  Look ahead to distinguish
+               if not Ada.Text_IO.End_Of_File (Compiler_Obj.File_Obj) then
+                  declare
+                     Next_Char : Character;
+                     End_Of_Line : Boolean;
+                     Is_Char_Literal : Boolean := False;
+                  begin
+                     Ada.Text_IO.Look_Ahead (Compiler_Obj.File_Obj, Next_Char, End_Of_Line);
+                     --  If next char is graphic, might be character literal
+                     if Ada.Characters.Handling.Is_Graphic (Next_Char) and Next_Char /= ''' then
+                        Is_Char_Literal := True;  -- Assume character literal 'x'
+                     end if;
+
+                     Get_Next_Char (Compiler_Obj);
+                     if Is_Char_Literal then
+                        Scan_Character_Literal (Compiler_Obj, Token_Obj);
+                     else
+                        --  Apostrophe operator
+                        Token_Obj.String_Buffer (1) := ''';
+                        Token_Obj.String_Length := 1;
+                        Token_Obj.Kind := Apostrophe_Op_Token;
+                        Token_Obj.Is_Operator := True;
+                     end if;
+                  end;
+               else
+                  --  End of file after ', treat as operator
+                  Get_Next_Char (Compiler_Obj);
+                  Token_Obj.String_Buffer (1) := ''';
+                  Token_Obj.String_Length := 1;
+                  Token_Obj.Kind := Apostrophe_Op_Token;
+                  Token_Obj.Is_Operator := True;
+               end if;
             when '"' =>
                Get_Next_Char (Compiler_Obj);
                Scan_String_Literal (Compiler_Obj, Token_Obj);
@@ -679,13 +715,18 @@ is
          end case;
       end if;
 
-      Parser_Obj.Current_Token_Index := Parser_Obj.Next_Token_Index;
-      Parser_Obj.Next_Token_Index := @ + 1;
+      --  Check if we need to skip comments BEFORE updating indices
+      declare
+         Is_Comment : constant Boolean := Token_Obj.Kind = Line_Comment_Token;
+      begin
+         Parser_Obj.Current_Token_Index := Parser_Obj.Next_Token_Index;
+         Parser_Obj.Next_Token_Index := @ + 1;
 
-      --  Skip comments by tail recursively calling Get_Next_Token
-      if Token_Obj.Kind = Line_Comment_Token then
-         Get_Next_Token (Compiler_Obj);
-      end if;
+         --  Skip comments by tail recursively calling Get_Next_Token
+         if Is_Comment then
+            Get_Next_Token (Compiler_Obj);
+         end if;
+      end;
    end Get_Next_Token;
 
    procedure Init_Reserved_Words_Table with
@@ -709,15 +750,19 @@ is
       Reserved_Words_Table.Insert ("else", Else_Token);
       Reserved_Words_Table.Insert ("enum", Enum_Token);
       Reserved_Words_Table.Insert ("false", False_Token);
+      Reserved_Words_Table.Insert ("first", First_Token); --  attribute
       Reserved_Words_Table.Insert ("for", For_Token);
       Reserved_Words_Table.Insert ("foreign", Foreign_Token);
+      Reserved_Words_Table.Insert ("global", Global_Token); --  contract clause
       Reserved_Words_Table.Insert ("goto", Goto_Token);
       Reserved_Words_Table.Insert ("if", If_Token);
       Reserved_Words_Table.Insert ("in", In_Token);
       Reserved_Words_Table.Insert ("inout", Inout_Token);
-      Reserved_Words_Table.Insert ("invariant", Invariant_Token); --  attribute
       Reserved_Words_Table.Insert ("import", Import_Token);
       Reserved_Words_Table.Insert ("lambda", Lambda_Token);
+      Reserved_Words_Table.Insert ("last", Last_Token); --  attribute
+      Reserved_Words_Table.Insert ("loop_invariant", Loop_Invariant_Token); --  loop contract
+      Reserved_Words_Table.Insert ("loop_variant", Loop_Variant_Token); --  loop contract
       --  machine_width is a built-in constant, not a keyword
       --  It's handled as an identifier by the lexer and substituted in the parser
       Reserved_Words_Table.Insert ("mod", Mod_Token);
@@ -729,6 +774,7 @@ is
       Reserved_Words_Table.Insert ("pre", Pre_Token); --  attribute
       Reserved_Words_Table.Insert ("private", Private_Token);
       Reserved_Words_Table.Insert ("range", Range_Token);
+      Reserved_Words_Table.Insert ("reads", Reads_Token); --  contract clause
       Reserved_Words_Table.Insert ("renames", Renames_Token);
       Reserved_Words_Table.Insert ("return", Return_Token);
       Reserved_Words_Table.Insert ("size", Size_Token); --  attribute
@@ -739,11 +785,13 @@ is
       Reserved_Words_Table.Insert ("switch", Switch_Token);
       Reserved_Words_Table.Insert ("true", True_Token);
       Reserved_Words_Table.Insert ("type", Type_Token);
+      Reserved_Words_Table.Insert ("type_invariant", Type_Invariant_Token); --  type attribute
       Reserved_Words_Table.Insert ("union", Union_Token);
       Reserved_Words_Table.Insert ("unit", Unit_Token);
       Reserved_Words_Table.Insert ("void", Void_Token);
       Reserved_Words_Table.Insert ("volatile", Volatile_Token);
       Reserved_Words_Table.Insert ("while", While_Token);
+      Reserved_Words_Table.Insert ("writes", Writes_Token); --  contract clause
    end Init_Reserved_Words_Table;
 
 --  Package elaboration:

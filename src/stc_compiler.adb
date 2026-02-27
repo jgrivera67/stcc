@@ -61,4 +61,16 @@ package body STC_Compiler is
                    Trim (Lexer_Obj.Column_Number'Image, Ada.Strings.Left) &
                    " error: " & Message);
    end Log_Compiler_Error;
+
+   procedure Log_Compiler_Error (Compiler_Obj : Compiler_Type;
+                                 Token : Token_Type;
+                                 Message : String) is
+      use Ada.Strings.Fixed;
+   begin
+      Log_Message (Compiler_Obj.File_Name.all & ":" &
+                   Trim (Token.Line_Number'Image, Ada.Strings.Left) & ":" &
+                   Trim (Token.Column_Number'Image, Ada.Strings.Left) &
+                   " error: " & Message);
+   end Log_Compiler_Error;
+
 end STC_Compiler;

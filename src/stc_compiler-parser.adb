@@ -31,6 +31,11 @@ package body STC_Compiler.Parser is
        AST_Array_Subscript_Op => Operator_Precedence_Type'Last,
        AST_Function_Call_Op => Operator_Precedence_Type'Last,
        AST_Type_Cast_Op => Operator_Precedence_Type'Last,
+       --  Attribute operators have highest precedence (postfix operators)
+       AST_First_Attribute_Op => Operator_Precedence_Type'Last,
+       AST_Last_Attribute_Op => Operator_Precedence_Type'Last,
+       AST_Range_Attribute_Op => Operator_Precedence_Type'Last,
+       AST_Size_Attribute_Op => Operator_Precedence_Type'Last,
        AST_Address_Of_Op => Operator_Precedence_Type'Last - 1,
        AST_Pointer_Declaration_Op => Operator_Precedence_Type'Last - 1,
        AST_Pointer_Dereference_Op => Operator_Precedence_Type'Last - 1,
@@ -120,6 +125,10 @@ package body STC_Compiler.Parser is
    procedure Parse_Declaration (Compiler_Obj : in out Compiler_Type;
                                Declaration_Node : out AST_Node_Pointer_Type);
 
+   procedure Parse_Contract_Attribute (Compiler_Obj : in out Compiler_Type;
+                                       Contract_Type : out Token_Kind_Type;
+                                       Contract_Node : out AST_Node_Pointer_Type);
+
    procedure Expect_Token (Compiler_Obj : in out Compiler_Type;
                           Expected : Token_Kind_Type) is
       Parser_Obj : Parser_Type renames Compiler_Obj.Parser_Obj;
@@ -128,6 +137,7 @@ package body STC_Compiler.Parser is
    begin
       if Current_Token_Obj.Kind /= Expected then
          Log_Compiler_Error (Compiler_Obj,
+            Current_Token_Obj,
             "Expected " & Expected'Image & " but found '" &
             Current_Token_Obj.String_Buffer (
                1 .. Current_Token_Obj.String_Length) & "'");
@@ -402,6 +412,103 @@ package body STC_Compiler.Parser is
 
       Expect_Token (Compiler_Obj, Semicolon_Token);
    end Parse_Type_Declaration;
+
+   procedure Parse_Contract_Attribute (Compiler_Obj : in out Compiler_Type;
+                                       Contract_Type : out Token_Kind_Type;
+                                       Contract_Node : out AST_Node_Pointer_Type)
+   is
+      Parser_Obj : Parser_Type renames Compiler_Obj.Parser_Obj;
+      Current_Token_Obj : Token_Type renames
+         Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index);
+   begin
+      Contract_Node := null;
+      Contract_Type := Invalid_Token;
+
+      --  Expect [[ to start contract attribute
+      if Current_Token_Obj.Kind /= Left_Double_Square_Parenthesis_Token then
+         return;  --  No contract attribute
+      end if;
+      Lexer.Get_Next_Token (Compiler_Obj);  --  Skip [[
+
+      --  Expect contract type: pre, post, or global
+      case Current_Token_Obj.Kind is
+         when Pre_Token | Post_Token =>
+            Contract_Type := Current_Token_Obj.Kind;
+            Lexer.Get_Next_Token (Compiler_Obj);  --  Skip pre/post
+            Expect_Token (Compiler_Obj, Left_Parenthesis_Token);
+            Parse_Expression (Compiler_Obj);
+            --  TODO: Pop expression from stack and store in Contract_Node
+            Expect_Token (Compiler_Obj, Right_Parenthesis_Token);
+
+         when Global_Token =>
+            Contract_Type := Global_Token;
+            Lexer.Get_Next_Token (Compiler_Obj);  --  Skip global
+            Expect_Token (Compiler_Obj, Left_Parenthesis_Token);
+
+            --  Parse global clauses: reads => (...), writes => (...)
+            while Current_Token_Obj.Kind = Reads_Token or else
+                  Current_Token_Obj.Kind = Writes_Token
+            loop
+               declare
+                  Global_Node : constant AST_Node_Pointer_Type :=
+                     new AST_Node_Type (AST_Global_Contract_Node);
+               begin
+                  Global_Node.Is_Reads := (Current_Token_Obj.Kind = Reads_Token);
+                  Lexer.Get_Next_Token (Compiler_Obj);  --  Skip reads/writes
+
+                  Expect_Token (Compiler_Obj, Arrow_Op_Token);  --  =>
+                  Expect_Token (Compiler_Obj, Left_Parenthesis_Token);
+
+                  --  Parse list of identifiers: (var1, var2, ...)
+                  loop
+                     if Current_Token_Obj.Kind /= Identifier_Token then
+                        Log_Compiler_Error (Compiler_Obj,
+                           Current_Token_Obj,
+                           "Expected variable identifier in global clause");
+                        raise Program_Error;
+                     end if;
+                     --  TODO: Create identifier and link to Global_Node.First_Global_Variable
+                     Lexer.Get_Next_Token (Compiler_Obj);
+
+                     exit when Current_Token_Obj.Kind /= Comma_Token;
+                     Lexer.Get_Next_Token (Compiler_Obj);  --  Skip comma
+                  end loop;
+
+                  Expect_Token (Compiler_Obj, Right_Parenthesis_Token);
+
+                  --  Link global node to contract list
+                  if Contract_Node = null then
+                     Contract_Node := Global_Node;
+                  else
+                     --  Find end of list and append
+                     declare
+                        Last_Node : AST_Node_Pointer_Type := Contract_Node;
+                     begin
+                        while Last_Node.Next_Sibling /= null loop
+                           Last_Node := Last_Node.Next_Sibling;
+                        end loop;
+                        Last_Node.Next_Sibling := Global_Node;
+                     end;
+                  end if;
+
+                  --  Check for comma (more clauses) or closing paren
+                  exit when Current_Token_Obj.Kind /= Comma_Token;
+                  Lexer.Get_Next_Token (Compiler_Obj);  --  Skip comma
+               end;
+            end loop;
+
+            Expect_Token (Compiler_Obj, Right_Parenthesis_Token);
+
+         when others =>
+            Log_Compiler_Error (Compiler_Obj,
+               Current_Token_Obj,
+               "Expected contract type (pre, post, or global) in [[...]] attribute");
+            raise Program_Error;
+      end case;
+
+      --  Expect ]] to close contract attribute
+      Expect_Token (Compiler_Obj, Right_Double_Square_Parenthesis_Token);
+   end Parse_Contract_Attribute;
 
    procedure Parse_Subtype_Declaration (Compiler_Obj : in out Compiler_Type;
                                         Subtype_Node : out AST_Node_Pointer_Type) is
@@ -862,6 +969,18 @@ package body STC_Compiler.Parser is
                when Bitwise_Not_Op_Token =>
                   Handle_Operator (AST_Bitwise_Not_Op, AST_Unary_Expression_Node);
 
+               when Sizeof_Token =>
+                  --  sizeof operator: sizeof(type) or sizeof(expression)
+                  Lexer.Get_Next_Token (Compiler_Obj);  --  Skip 'sizeof'
+                  Expect_Token (Compiler_Obj, Left_Parenthesis_Token);
+                  --  Parse the argument (could be type or expression)
+                  --  For now, just parse as expression
+                  --  TODO: Distinguish between type identifiers and variable identifiers
+                  Parse_Expression (Compiler_Obj);
+                  Expect_Token (Compiler_Obj, Right_Parenthesis_Token);
+                  --  Create sizeof operator node
+                  Handle_Operator (AST_Sizeof_Op, AST_Unary_Expression_Node);
+
                when Divide_Op_Token =>
                   Handle_Operator (AST_Arithmetic_Divide_Op, AST_Binary_Expression_Node);
 
@@ -915,6 +1034,34 @@ package body STC_Compiler.Parser is
 
                when Arrow_Op_Token =>
                   Handle_Operator (AST_Struct_Pointer_Field_Dereference_Op, AST_Binary_Expression_Node);
+
+               when Apostrophe_Op_Token =>
+                  --  Identifier attribute operator: identifier'Attribute
+                  --  The identifier is already on the operand stack
+                  Lexer.Get_Next_Token (Compiler_Obj);  --  Skip '
+
+                  --  Expect attribute name (first, last, range, size)
+                  declare
+                     Attr_Op : AST_Operator_Type;
+                  begin
+                     case Current_Token_Obj.Kind is
+                        when First_Token =>
+                           Attr_Op := AST_First_Attribute_Op;
+                        when Last_Token =>
+                           Attr_Op := AST_Last_Attribute_Op;
+                        when Range_Token =>
+                           Attr_Op := AST_Range_Attribute_Op;
+                        when Size_Token =>
+                           Attr_Op := AST_Size_Attribute_Op;
+                        when others =>
+                           Log_Compiler_Error (Compiler_Obj,
+                              Current_Token_Obj,
+                              "Expected attribute name (first, last, range, size) after apostrophe");
+                           raise Program_Error;
+                     end case;
+
+                     Handle_Operator (Attr_Op, AST_Unary_Expression_Node);
+                  end;
 
                when Question_Mark_Token =>
                   --  Ternary operator - reduce previous expression
