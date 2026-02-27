@@ -121,16 +121,16 @@ The lexical structure of \emph{stC} consists of the following token types:
 The following identifiers are reserved as keywords and cannot be used as identifiers:
 
 \begin{lstlisting}
-as          assert      auto        bool        break
-case        char        compile_if  const       continue
-convention  default     do          else        enum
-false       for         foreign     goto        if
-import      in          inout       invariant   lambda
-modular     module      out         packed      post
-pre         private     range       renames     return
-size        sizeof      static      struct      subtype
-switch      true        type        union       void
-volatile    while
+as              assert          auto            bool            break
+case            char            compile_if      const           continue
+convention      default         do              else            enum
+false           for             foreign         goto            if
+import          in              inout           lambda          loop_invariant
+loop_variant    modular         module          out             packed
+post            pre             private         range           renames
+return          size            sizeof          static          struct
+subtype         switch          true            type            type_invariant
+union           void            volatile        while
 \end{lstlisting}
 
 Note: \verb'machine_width' is not a keyword but a built-in constant (see section on Built-in Constants).
@@ -388,14 +388,14 @@ module stdint {
 
 <if-statement> ::= "if" "(" <boolean-expression> ")" <statement-block> ("else" <statement-block>)?
 
-<while-statement> ::= "while" "(" <boolean-expression> ")" <statement-block>
+<while-statement> ::= "while" "(" <boolean-expression> ")" (<loop-attributes>)? <statement-block>
 
 <do-while-statement> ::= "do" <statement-block> "while" "(" <boolean-expression> ")" ";"
 
 <for-statement> ::=
    "for" "(" (<local-variable-declaration> | <assignment>)? ";"
    <boolean-expression>? ";"
-   <assignment>? ")" <statement-block>
+   <assignment>? ")" (<loop-attributes>)? <statement-block>
 
 <switch-statement> ::=
    "switch" "(" <expression> ")" "{"
@@ -490,7 +490,10 @@ module stdint {
       (("[" <expression> "]") |
        ("(" (<function-call-argument> ("," <function-call-argument>)*)? ")") |
        ("." <struct-field-identifier>) |
-       ("->" <struct-field-identifier>))*
+       ("->" <struct-field-identifier>) |
+       ("'" <identifier-attribute>))*
+
+<identifier-attribute> ::= "first" | "last" | "range" | "size"
 
 <primary-expression> ::=
    <identifier> |
@@ -545,27 +548,49 @@ module stdint {
 
 <void-function-identifier> ::= "<identifier>"
 
-<type-attributes> ::=
-   ("@" <type-attribute-name>)+
-
-<type-attribute-name> ::= "size" | "machine_width" | "packed" | "at" "(" <constant-expression> ")"
-
 <variable-attributes> ::=
    ("@" <variable-attribute-name>)+
 
 <variable-attribute-name> ::= "at" "(" <constant-expression> ")" | "volatile"
 
 <function-attributes> ::=
-   <contract-clause>+
+   <function-attribute>+
 
-<contract-clause> ::=
-   <precondition> | <postcondition> | <invariant>
+<function-attribute> ::=
+   "[[" <function-contract> "]]"
+
+<function-contract> ::=
+   <precondition> | <postcondition> | <global-clause>
 
 <precondition> ::= "pre" "(" <boolean-expression> ")"
 
 <postcondition> ::= "post" "(" <boolean-expression> ")"
 
-<invariant> ::= "invariant" "(" <boolean-expression> ")"
+<global-clause> ::=
+   "global" "(" <global-effect> ("," <global-effect>)* ")"
+
+<global-effect> ::=
+   ("reads" | "writes") "=>" "(" <identifier> ("," <identifier>)* ")"
+
+<loop-attributes> ::=
+   <loop-attribute>+
+
+<loop-attribute> ::=
+   "[[" <loop-contract> "]]"
+
+<loop-contract> ::=
+   <loop-invariant> | <loop-variant>
+
+<loop-invariant> ::= "loop_invariant" "(" <boolean-expression> ")"
+
+<loop-variant> ::= "loop_variant" "(" <expression> ")"
+
+<type-attributes> ::=
+   ("@" <type-attribute-name>)+
+
+<type-attribute-name> ::=
+   "size" | "machine_width" | "packed" | "at" "(" <constant-expression> ")" |
+   "type_invariant" "(" <boolean-expression> ")"
 
 \end{lstlisting}
 %\end{grammar}
@@ -738,6 +763,21 @@ p.age = 30;
 p.is_employed = true;
 \end{lstlisting}
 
+\subsection{Structure Types with Type Invariants}
+
+Type invariants specify constraints that must always hold for instances of a type:
+
+\begin{lstlisting}
+type range -1000 .. 1000 coordinate_t;
+type struct {
+  coordinate_t x;
+  coordinate_t y;
+} point_t @type_invariant(x * x + y * y <= 1000000);
+
+// This ensures all point_t values satisfy the distance constraint
+// from origin: sqrt(x^2 + y^2) <= 1000
+\end{lstlisting}
+
 \subsection{Union Types}
 \begin{lstlisting}
 type range -2147483648 .. 2147483647 int_t;
@@ -773,6 +813,20 @@ m[0][0] = 1;
 
 \section{Functions}
 
+\subsection{Attributes and Aspects}
+
+In \emph{stC}, C23-style attributes (using \verb'[[...]]' syntax) are the mechanism for specifying aspects, similar to Ada/SPARK aspects. This includes:
+\begin{itemize}
+\item \textbf{Function contracts}: \verb'pre', \verb'post', \verb'global' (with \verb'reads'/\verb'writes')
+\item \textbf{Loop contracts}: \verb'loop_invariant', \verb'loop_variant'
+\item \textbf{Type attributes}: \verb'@type_invariant', \verb'@packed', \verb'@size', \verb'@at'
+\item \textbf{Variable attributes}: \verb'@volatile', \verb'@at'
+\end{itemize}
+
+The \verb'[[...]]' syntax provides a familiar C-like notation while enabling the same level of specification and verification found in Ada/SPARK.
+
+\textbf{Note:} Type and variable attributes use the \verb'@' prefix syntax, while function and loop contracts use the \verb'[[...]]' syntax.
+
 \subsection{Simple Function}
 \begin{lstlisting}
 int_t add(in int_t a, in int_t b) {
@@ -781,15 +835,44 @@ int_t add(in int_t a, in int_t b) {
 \end{lstlisting}
 
 \subsection{Function with Contracts}
+
+Contracts in \emph{stC} use C23-style attribute syntax with double square brackets \verb'[[...]]'. This is \emph{stC}'s way of implementing aspects, similar to SPARK contracts.
+
 \begin{lstlisting}
 type range -2147483648 .. 2147483647 int_t;
 subtype int_t range 0 .. 2147483647 natural_t;
 
 natural_t divide(in natural_t a, in int_t b)
-    pre(b != 0)
-    post(result * b <= a && result * b + b > a)
+    [[pre(b != 0)]]
+    [[post(result * b <= a && result * b + b > a)]]
 {
   return a / b;
+}
+\end{lstlisting}
+
+\subsection{Function with Global-Effect Contracts}
+
+Global-effect contracts specify which global variables a function reads or writes, similar to SPARK's \verb'Global' aspect:
+
+\begin{lstlisting}
+type modular 1 << 32 uint32_t;
+uint32_t global_counter;
+uint32_t global_sum;
+
+uint32_t increment_counter()
+  [[global(reads => (global_counter), writes => (global_sum))]]
+  [[pre(global_counter < 1000)]]
+  [[post(global_sum > 0)]]
+{
+  global_sum = global_sum + global_counter;
+  return global_sum;
+}
+
+// Function that only reads globals (no writes)
+uint32_t compute_total()
+  [[global(reads => (global_counter, global_sum))]]
+{
+  return global_counter + global_sum;
 }
 \end{lstlisting}
 
@@ -830,6 +913,30 @@ index_t i = 0;
 while (i < 10) {
   // Loop body
   i = i + 1;
+}
+\end{lstlisting}
+
+\subsection{While Loop with Loop Contracts}
+
+Loop contracts specify invariants and variants for formal verification:
+
+\begin{lstlisting}
+type range 0 .. 99 index_t;
+type modular 1 << 32 uint32_t;
+
+uint32_t sum_array(index_t[] arr, uint32_t length) {
+  uint32_t sum = 0;
+  index_t i = 0;
+
+  while (i < length)
+    [[loop_invariant(i <= length)]]
+    [[loop_variant(length - i)]]
+  {
+    sum = sum + arr[i];
+    i = i + 1;
+  }
+
+  return sum;
 }
 \end{lstlisting}
 
@@ -879,6 +986,91 @@ switch (day) {
     break;
 }
 \end{lstlisting}
+
+\section{Identifier Attributes}
+
+\emph{stC} supports SPARK-style identifier attributes using the apostrophe operator. These attributes provide type and array information at compile time:
+
+\subsection{Range Type Attributes}
+
+\begin{lstlisting}
+type range 0 .. 99 index_t;
+type modular 100 array_100_t[100];
+
+uint32_t process_array(array_100_t arr) {
+  uint32_t sum;
+  index_t i;
+
+  sum = 0;
+
+  // 'first gives the first valid index value
+  i = index_t'first;
+
+  // 'last gives the last valid index value
+  while (i <= index_t'last) {
+    sum = sum + arr[i];
+    i = i + 1;
+  }
+
+  return sum;
+}
+\end{lstlisting}
+
+\subsection{Array Attributes}
+
+Like Ada/SPARK, identifier attributes also work with arrays to query their index ranges:
+
+\begin{lstlisting}
+type range 0 .. 99 index_t;
+type modular 256 byte_t;
+
+byte_t buffer[50];
+
+void process_buffer() {
+  // For arrays, 'first returns the first index
+  index_t first_idx = buffer'first;  // Returns 0
+
+  // For arrays, 'last returns the last index
+  index_t last_idx = buffer'last;    // Returns 49
+
+  // For arrays, 'range returns the index range
+  for (index_t i in buffer'range) {
+    buffer[i] = 0;
+  }
+}
+\end{lstlisting}
+
+\subsection{Available Attributes}
+
+\begin{itemize}
+\item \verb'identifier'first' -- For range types: returns the first value of the range. For arrays: returns the first index
+\item \verb'identifier'last' -- For range types: returns the last value of the range. For arrays: returns the last index
+\item \verb'identifier'range' -- For range types: returns the full range. For arrays: returns the index range
+\item \verb'identifier'size' -- Returns the size in bytes (not bits)
+\end{itemize}
+
+\section{Sizeof Operator}
+
+The \verb'sizeof' operator returns the size in bytes of a type or expression, similar to C:
+
+\begin{lstlisting}
+type range 0 .. 255 byte_t;
+type struct {
+  byte_t x;
+  byte_t y;
+} point_t;
+
+// sizeof with type name
+uint32_t size1 = sizeof(point_t);   // Size of the type
+uint32_t size2 = sizeof(byte_t);    // Size of byte_t
+
+// sizeof with expression
+point_t p;
+uint32_t size3 = sizeof(p);         // Size of the variable
+uint32_t size4 = sizeof(p.x);       // Size of the field
+\end{lstlisting}
+
+\textbf{Note:} Both \verb'identifier'size' and \verb'sizeof(identifier)' return size in bytes. Use \verb'sizeof' when you need the size of an expression or when the C-style syntax is preferred.
 
 \section{Expressions}
 

@@ -1,0 +1,52 @@
+//
+//  Example file demonstrating global-effect contracts and attributes
+//
+
+module contracts_example {
+
+  // Global variables
+  type modular 1 << 32 uint32_t;
+  uint32_t global_counter;
+  uint32_t global_sum;
+
+  // Array type for demonstrating 'Range, 'First, 'Last
+  type range 0 .. 99 index_t;
+  type modular 100 array_100_t[100];
+
+  // Function with global contract - reads one variable, writes another
+  uint32_t increment_counter()
+    [[global(reads => (global_counter), writes => (global_sum))]]
+    [[pre(global_counter < 1000)]]
+    [[post(global_sum > 0)]]
+  {
+    global_sum = global_sum + global_counter;
+    return global_sum;
+  }
+
+  // Function demonstrating attribute usage
+  uint32_t process_array(array_100_t arr) {
+    uint32_t sum;
+    index_t i;
+
+    sum = 0;
+
+    // Using attributes: 'First, 'Last give the bounds
+    // 'Range gives the full range
+    // 'Size gives size in bytes
+    i = index_t'First;
+    while (i <= index_t'Last) {
+      sum = sum + arr[i];
+      i = i + 1;
+    }
+
+    return sum;
+  }
+
+  // Function that only reads globals (no writes)
+  uint32_t compute_total()
+    [[global(reads => (global_counter, global_sum))]]
+  {
+    return global_counter + global_sum;
+  }
+
+}

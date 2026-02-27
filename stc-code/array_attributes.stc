@@ -1,0 +1,79 @@
+// Array Attributes Example
+// Demonstrates SPARK-style identifier attributes for arrays
+
+module array_attributes {
+
+type range 0 .. 255 byte_t;
+type range 0 .. 99 index_t;
+type modular 1 << 32 uint32_t;
+
+// Example 1: Using 'first and 'last with arrays
+byte_t buffer[50];
+
+void initialize_buffer() {
+  // For arrays, 'first returns the first valid index
+  index_t first_idx = buffer'first;  // Returns 0
+
+  // For arrays, 'last returns the last valid index
+  index_t last_idx = buffer'last;    // Returns 49
+
+  // Use attributes to iterate safely
+  for (index_t i = buffer'first; i <= buffer'last; i = i + 1) {
+    buffer[i] = 0;
+  }
+}
+
+// Example 2: Using 'range with arrays
+byte_t data[100];
+
+void clear_data() {
+  // 'range returns the complete index range
+  for (index_t i in data'range) {
+    data[i] = 0;
+  }
+}
+
+// Example 3: Function that uses array attributes
+uint32_t sum_array(byte_t[] arr)
+  [[pre(arr'first <= arr'last)]]
+  [[post(result >= 0)]]
+{
+  uint32_t sum = 0;
+
+  // Use array attributes to determine bounds
+  for (index_t i in arr'range) {
+    sum = sum + arr[i];
+  }
+
+  return sum;
+}
+
+// Example 4: Computing array length using attributes
+index_t get_array_length(byte_t[] arr) {
+  // Array length can be computed from 'first and 'last
+  return (arr'last - arr'first) + 1;
+}
+
+// Example 5: Mixing range type and array attributes
+void example_mixed() {
+  byte_t values[10];
+
+  // Range type attributes
+  byte_t min_value = byte_t'first;  // 0
+  byte_t max_value = byte_t'last;   // 255
+
+  // Array attributes
+  index_t first_index = values'first;  // 0
+  index_t last_index = values'last;    // 9
+
+  // Initialize array with range boundaries
+  for (index_t i in values'range) {
+    if (i < 5) {
+      values[i] = byte_t'first;
+    } else {
+      values[i] = byte_t'last;
+    }
+  }
+}
+
+} // module array_attributes
