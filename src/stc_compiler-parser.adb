@@ -125,9 +125,12 @@ package body STC_Compiler.Parser is
    procedure Parse_Declaration (Compiler_Obj : in out Compiler_Type;
                                Declaration_Node : out AST_Node_Pointer_Type);
 
+   --  TODO: Will be used once function declaration parsing is complete
+   pragma Warnings (Off, "procedure ""Parse_Contract_Attribute"" is not referenced");
    procedure Parse_Contract_Attribute (Compiler_Obj : in out Compiler_Type;
                                        Contract_Type : out Token_Kind_Type;
                                        Contract_Node : out AST_Node_Pointer_Type);
+   pragma Warnings (On, "procedure ""Parse_Contract_Attribute"" is not referenced");
 
    procedure Expect_Token (Compiler_Obj : in out Compiler_Type;
                           Expected : Token_Kind_Type) is
@@ -316,6 +319,41 @@ package body STC_Compiler.Parser is
             Lexer.Get_Next_Token (Compiler_Obj);
             Parse_Expression (Compiler_Obj);
             --  TODO: Create modular type node
+
+         when Float_Token =>
+            --  Floating point type: type float digits 6 Foo;
+            --  or: type float digits 6 range -273.15 .. 1000.0 Foo;
+            Lexer.Get_Next_Token (Compiler_Obj);
+            Expect_Token (Compiler_Obj, Digits_Token);
+            Parse_Expression (Compiler_Obj);  --  Precision (digits)
+            --  Check for optional range clause
+            if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Range_Token then
+               Lexer.Get_Next_Token (Compiler_Obj);
+               Parse_Expression (Compiler_Obj);  --  Min value
+               Expect_Token (Compiler_Obj, Range_Op_Token);
+               Parse_Expression (Compiler_Obj);  --  Max value
+            end if;
+            --  TODO: Create float type node
+
+         when Fixed_Token =>
+            --  Ordinary fixed point type: type fixed delta 0.01 range -100.0 .. 100.0 Foo;
+            Lexer.Get_Next_Token (Compiler_Obj);
+            Expect_Token (Compiler_Obj, Delta_Token);
+            Parse_Expression (Compiler_Obj);  --  Delta value
+            Expect_Token (Compiler_Obj, Range_Token);
+            Parse_Expression (Compiler_Obj);  --  Min value
+            Expect_Token (Compiler_Obj, Range_Op_Token);
+            Parse_Expression (Compiler_Obj);  --  Max value
+            --  TODO: Create fixed type node
+
+         when Decimal_Token =>
+            --  Decimal fixed point type: type decimal delta 0.01 digits 10 Foo;
+            Lexer.Get_Next_Token (Compiler_Obj);
+            Expect_Token (Compiler_Obj, Delta_Token);
+            Parse_Expression (Compiler_Obj);  --  Delta value
+            Expect_Token (Compiler_Obj, Digits_Token);
+            Parse_Expression (Compiler_Obj);  --  Precision (digits)
+            --  TODO: Create decimal type node
 
          when Struct_Token | Union_Token =>
             --  Struct or union type: type struct { ... } Foo;

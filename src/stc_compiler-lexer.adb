@@ -5,8 +5,6 @@
 --  SPDX-License-Identifier: Apache-2.0
 --
 with Ada.Characters.Handling;
-with Ada.Text_IO;
-with Ada.Strings.Fixed;
 
 package body STC_Compiler.Lexer with
    SPARK_Mode => Off
@@ -377,7 +375,7 @@ is
                   begin
                      Ada.Text_IO.Look_Ahead (Compiler_Obj.File_Obj, Next_Char, End_Of_Line);
                      --  If next char is graphic, might be character literal
-                     if Ada.Characters.Handling.Is_Graphic (Next_Char) and Next_Char /= ''' then
+                     if Ada.Characters.Handling.Is_Graphic (Next_Char) and then Next_Char /= ''' then
                         Is_Char_Literal := True;  -- Assume character literal 'x'
                      end if;
 
@@ -745,12 +743,17 @@ is
       Reserved_Words_Table.Insert ("const", Const_Token);
       Reserved_Words_Table.Insert ("continue", Continue_Token);
       Reserved_Words_Table.Insert ("convention", Convention_Token); --  attribute
+      Reserved_Words_Table.Insert ("decimal", Decimal_Token);
       Reserved_Words_Table.Insert ("default", Default_Token);
+      Reserved_Words_Table.Insert ("delta", Delta_Token);
+      Reserved_Words_Table.Insert ("digits", Digits_Token);
       Reserved_Words_Table.Insert ("do", Do_Token);
       Reserved_Words_Table.Insert ("else", Else_Token);
       Reserved_Words_Table.Insert ("enum", Enum_Token);
       Reserved_Words_Table.Insert ("false", False_Token);
       Reserved_Words_Table.Insert ("first", First_Token); --  attribute
+      Reserved_Words_Table.Insert ("fixed", Fixed_Token);
+      Reserved_Words_Table.Insert ("float", Float_Token);
       Reserved_Words_Table.Insert ("for", For_Token);
       Reserved_Words_Table.Insert ("foreign", Foreign_Token);
       Reserved_Words_Table.Insert ("global", Global_Token); --  contract clause

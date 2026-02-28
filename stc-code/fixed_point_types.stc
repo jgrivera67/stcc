@@ -1,0 +1,161 @@
+//
+//  Fixed Point Types Example
+//
+//  Demonstrates Ada-style ordinary and decimal fixed point types
+//
+
+module fixed_point_types {
+
+  // Ordinary Fixed Point Types
+  // These require explicit delta and range specification
+
+  type fixed delta 0.001 range 0.0 .. 5.0 voltage_t;         // Millivolt precision
+  type fixed delta 0.01 range -100.0 .. 100.0 sensor_t;      // Centimeter precision
+  type fixed delta 0.125 range 0.0 .. 1000.0 precise_t;      // 1/8 precision
+  type fixed delta 0.1 range -50.0 .. 150.0 temperature_t;   // Tenth of degree
+
+  // Decimal Fixed Point Types
+  // Optimized for financial and decimal calculations
+
+  type decimal delta 0.01 digits 10 money_t;       // Currency with cents, up to 99,999,999.99
+  type decimal delta 0.001 digits 12 price_t;      // High-precision pricing
+  type decimal delta 0.0001 digits 8 interest_t;   // Interest rates (basis points)
+  type decimal delta 0.01 digits 6 tax_rate_t;     // Tax rates as percentages
+
+  // Hardware interface example - voltage measurements
+  voltage_t supply_voltage = 3.300;    // Exactly 3.300V
+  voltage_t reference_voltage = 1.250; // Exactly 1.250V
+
+  voltage_t read_adc_voltage(type range 0 .. 4095 adc_value)
+    [[pre(adc_value >= 0 && adc_value <= 4095)]]
+    [[post(result >= 0.0 && result <= 5.0)]]
+  {
+    // Convert 12-bit ADC reading to voltage
+    // 5.0V reference, exact computation with fixed point
+    return (adc_value * 5.0) / 4095.0;
+  }
+
+  // Sensor reading example
+  sensor_t current_position = 0.00;
+  sensor_t target_position = 25.50;
+
+  sensor_t calculate_error()
+    [[post(result >= -100.0 && result <= 100.0)]]
+  {
+    return target_position - current_position;
+  }
+
+  // Financial calculations with decimal fixed point
+  money_t account_balance = 1234.56;
+  money_t daily_interest_rate = 0.05;  // 5 cents per day
+
+  money_t apply_interest()
+    [[pre(account_balance >= 0.0)]]
+    [[post(result >= account_balance)]]
+  {
+    return account_balance + daily_interest_rate;
+  }
+
+  // Complex financial calculation
+  type struct {
+    money_t principal;
+    interest_t annual_rate;  // As decimal (e.g., 0.0325 for 3.25%)
+    type range 1 .. 360 month_t;
+    month_t months;
+  } loan_t;
+
+  money_t calculate_monthly_payment(loan_t loan)
+    [[pre(loan.principal > 0.0)]]
+    [[pre(loan.annual_rate > 0.0)]]
+    [[pre(loan.months > 0)]]
+    [[post(result > 0.0)]]
+  {
+    // Calculate monthly interest rate
+    interest_t monthly_rate = loan.annual_rate / 12.0;
+
+    // Monthly payment formula: P * (r * (1+r)^n) / ((1+r)^n - 1)
+    // Simplified for demonstration
+    interest_t factor = (1.0 + monthly_rate) ** loan.months;
+    return loan.principal * (monthly_rate * factor) / (factor - 1.0);
+  }
+
+  // Accounting system example
+  type struct {
+    money_t debits;
+    money_t credits;
+  } account_t;
+
+  account_t checking_account = { debits = 0.0, credits = 0.0 };
+  account_t savings_account = { debits = 0.0, credits = 0.0 };
+
+  void post_debit(inout account_t account, money_t amount)
+    [[pre(amount >= 0.0)]]
+    [[post(account.debits >= amount)]]
+  {
+    account.debits = account.debits + amount;
+  }
+
+  void post_credit(inout account_t account, money_t amount)
+    [[pre(amount >= 0.0)]]
+    [[post(account.credits >= amount)]]
+  {
+    account.credits = account.credits + amount;
+  }
+
+  money_t get_balance(account_t account) {
+    return account.credits - account.debits;
+  }
+
+  // Tax calculation example
+  tax_rate_t sales_tax_rate = 8.25;  // 8.25% sales tax
+
+  money_t calculate_tax(money_t subtotal)
+    [[pre(subtotal >= 0.0)]]
+    [[post(result >= 0.0)]]
+  {
+    return subtotal * (sales_tax_rate / 100.0);
+  }
+
+  money_t calculate_total_with_tax(money_t subtotal)
+    [[pre(subtotal >= 0.0)]]
+    [[post(result >= subtotal)]]
+  {
+    money_t tax = calculate_tax(subtotal);
+    return subtotal + tax;
+  }
+
+  // Array of transactions
+  money_t transactions[1000];
+  type range 0 .. 999 transaction_index_t;
+
+  money_t calculate_total_transactions()
+    [[post(result >= 0.0)]]
+  {
+    money_t total = 0.0;
+
+    for (transaction_index_t i in transactions'range)
+      [[loop_invariant(total >= 0.0)]]
+      [[loop_variant(transactions'last - i)]]
+    {
+      total = total + transactions[i];
+    }
+
+    return total;
+  }
+
+  // Inventory pricing system
+  type struct {
+    price_t unit_price;
+    type range 0 .. 100000 quantity_t;
+    quantity_t quantity;
+  } inventory_item_t;
+
+  money_t calculate_inventory_value(inventory_item_t item)
+    [[pre(item.unit_price >= 0.0)]]
+    [[pre(item.quantity >= 0)]]
+    [[post(result >= 0.0)]]
+  {
+    return item.unit_price * item.quantity;
+  }
+
+} // module fixed_point_types

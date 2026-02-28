@@ -8,10 +8,9 @@
 with STC_Compiler;
 with Ada.Command_Line;
 with Ada.Text_IO;
-with Ada.Strings.Fixed;
 
 procedure Main with SPARK_Mode => Off is
-   File_Name : String (1 .. 256) := (others => ' ');
+   File_Name : String (1 .. 256) := [others => ' '];
    File_Name_Length : Natural := 0;
    Machine_Width : Positive := 32;  -- Default value
 begin

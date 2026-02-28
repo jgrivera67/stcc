@@ -1,0 +1,89 @@
+//
+//  Floating Point Types Example
+//
+//  Demonstrates Ada-style floating point types with digits precision
+//
+
+module floating_point_types {
+
+  // Basic floating point types with digits precision
+  type float digits 6 float32_t;         // At least 6 decimal digits (typically maps to Float)
+  type float digits 15 float64_t;        // At least 15 decimal digits (typically maps to Long_Float)
+
+  // Constrained floating point types with range
+  type float digits 6 range -273.15 .. 1000.0 temperature_t;
+  type float digits 8 range 0.0 .. 100.0 percentage_t;
+  type float digits 10 range -180.0 .. 180.0 longitude_t;
+  type float digits 10 range -90.0 .. 90.0 latitude_t;
+
+  // Physical measurements
+  type float digits 8 range 0.0 .. 10000.0 pressure_t;     // Pascals
+  type float digits 8 range 0.0 .. 1000.0 velocity_t;      // m/s
+  type float digits 10 range 0.0 .. 1.0e6 distance_t;      // meters
+
+  // Scientific computation example
+  float64_t calculate_velocity(distance_t d, float64_t t)
+    [[pre(t > 0.0)]]
+    [[post(result >= 0.0)]]
+  {
+    return d / t;
+  }
+
+  // Temperature conversion
+  temperature_t celsius_to_kelvin(temperature_t celsius)
+    [[pre(celsius >= -273.15)]]
+    [[post(result >= 0.0)]]
+  {
+    return celsius + 273.15;
+  }
+
+  // Coordinate system example
+  type struct {
+    latitude_t lat;
+    longitude_t lon;
+    distance_t altitude;
+  } gps_coordinate_t;
+
+  // Calculate distance between two GPS points (simplified)
+  distance_t calculate_distance(gps_coordinate_t p1, gps_coordinate_t p2) {
+    float64_t lat_diff = p2.lat - p1.lat;
+    float64_t lon_diff = p2.lon - p1.lon;
+    float64_t alt_diff = p2.altitude - p1.altitude;
+
+    // Pythagorean approximation (simplified, not accurate for real GPS)
+    return (lat_diff * lat_diff + lon_diff * lon_diff + alt_diff * alt_diff) ** 0.5;
+  }
+
+  // Percentage calculations
+  percentage_t cpu_usage_calculator(float64_t active_time, float64_t total_time)
+    [[pre(total_time > 0.0)]]
+    [[pre(active_time >= 0.0 && active_time <= total_time)]]
+    [[post(result >= 0.0 && result <= 100.0)]]
+  {
+    return (active_time / total_time) * 100.0;
+  }
+
+  // Array of measurements
+  temperature_t sensor_readings[100];
+
+  // Statistical calculation
+  temperature_t calculate_average()
+    [[pre(sensor_readings'first <= sensor_readings'last)]]
+  {
+    float64_t sum = 0.0;
+    type range 0 .. 99 index_t;
+    type modular 1 << 32 uint32_t;
+    uint32_t count = 0;
+
+    for (index_t i in sensor_readings'range) {
+      sum = sum + sensor_readings[i];
+      count = count + 1;
+    }
+
+    if (count > 0) {
+      return sum / count;
+    }
+    return 0.0;
+  }
+
+} // module floating_point_types

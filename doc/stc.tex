@@ -123,14 +123,16 @@ The following identifiers are reserved as keywords and cannot be used as identif
 \begin{lstlisting}
 as              assert          auto            bool            break
 case            char            compile_if      const           continue
-convention      default         do              else            enum
-false           for             foreign         goto            if
-import          in              inout           lambda          loop_invariant
-loop_variant    modular         module          out             packed
-post            pre             private         range           renames
-return          size            sizeof          static          struct
-subtype         switch          true            type            type_invariant
-union           void            volatile        while
+convention      decimal         default         delta           digits
+do              else            enum            false           first
+fixed           float           for             foreign         global
+goto            if              import          in              inout
+lambda          last            loop_invariant  loop_variant    modular
+module          out             packed          post            pre
+private         range           reads           renames         return
+size            sizeof          static          struct          subtype
+switch          true            type            type_invariant  union
+void            volatile        while           writes
 \end{lstlisting}
 
 Note: \verb'machine_width' is not a keyword but a built-in constant (see section on Built-in Constants).
@@ -320,6 +322,11 @@ module stdint {
 <type-declarator> ::=
    "range" <constant-integer-expression> ".." <constant-integer-expression> |
    "modular" <constant-integer-expression> |
+   "float" "digits" <constant-integer-expression>
+      ("range" <constant-expression> ".." <constant-expression>)? |
+   "fixed" "delta" <constant-expression> "range"
+      <constant-expression> ".." <constant-expression> |
+   "decimal" "delta" <constant-expression> "digits" <constant-integer-expression> |
    ("struct" | "union") "{" (<struct-field-declaration> ";")+ "}" |
    "enum" "{" <enum-entry> ("," <enum-entry>)* "}"
 
@@ -697,6 +704,115 @@ Modular types are ideal for:
 \item Cryptography and checksums
 \item Circular buffers and wraparound counters
 \item Compatibility with C unsigned integer types
+\end{itemize}
+
+\subsection{Floating Point Types}
+
+Floating point types define real number types with specified decimal precision. They are similar to Ada floating point types and provide approximate representation of real numbers.
+
+\textbf{Syntax:}
+\begin{lstlisting}
+type float digits <precision> <type-name>;
+type float digits <precision> range <min> .. <max> <type-name>;
+\end{lstlisting}
+
+The \verb'digits' clause specifies the minimum number of decimal digits of precision. An optional \verb'range' clause constrains the valid values.
+
+\textbf{Examples:}
+\begin{lstlisting}
+// Basic floating point types
+type float digits 6 float32_t;        // At least 6 decimal digits
+type float digits 15 float64_t;       // At least 15 decimal digits
+
+// Constrained floating point types
+type float digits 6 range -273.15 .. 1000.0 temperature_t;
+type float digits 8 range 0.0 .. 100.0 percentage_t;
+type float digits 10 range -180.0 .. 180.0 longitude_t;
+type float digits 10 range -90.0 .. 90.0 latitude_t;
+
+// Usage
+temperature_t room_temp = 22.5;
+percentage_t cpu_load = 87.3;
+latitude_t current_lat = 37.7749;
+longitude_t current_lon = -122.4194;
+\end{lstlisting}
+
+Floating point types are ideal for:
+\begin{itemize}
+\item Scientific computations requiring real numbers
+\item Measurements with decimal precision
+\item Geographic coordinates and spatial calculations
+\item Physics simulations
+\end{itemize}
+
+\textbf{Note:} The actual precision depends on the target platform's floating point implementation. The \verb'digits' value specifies the minimum required precision.
+
+\subsection{Fixed Point Types}
+
+Fixed point types define real number types with exact decimal representation using a fixed delta value. They provide better precision than floating point for certain ranges and are deterministic.
+
+\textbf{Ordinary Fixed Point Syntax:}
+\begin{lstlisting}
+type fixed delta <delta-value> range <min> .. <max> <type-name>;
+\end{lstlisting}
+
+The \verb'delta' specifies the smallest representable difference between values. All values are exact multiples of the delta.
+
+\textbf{Examples:}
+\begin{lstlisting}
+// Ordinary fixed point types
+type fixed delta 0.001 range 0.0 .. 5.0 voltage_t;      // mV precision
+type fixed delta 0.01 range -100.0 .. 100.0 sensor_t;   // 10ms precision
+type fixed delta 0.125 range 0.0 .. 1000.0 precise_t;   // 1/8 precision
+
+// Usage
+voltage_t supply_voltage = 3.300;  // Exactly 3.300V
+sensor_t reading = 25.75;          // Exactly 25.75
+precise_t measurement = 123.625;   // Exactly 123.625
+
+// All operations maintain exact precision
+voltage_t v1 = 1.500;
+voltage_t v2 = 1.750;
+voltage_t sum = v1 + v2;  // Exactly 3.250
+\end{lstlisting}
+
+\textbf{Decimal Fixed Point Syntax:}
+\begin{lstlisting}
+type decimal delta <delta-value> digits <precision> <type-name>;
+\end{lstlisting}
+
+Decimal fixed point types are specifically designed for financial calculations where exact decimal arithmetic is required.
+
+\textbf{Examples:}
+\begin{lstlisting}
+// Decimal fixed point for financial applications
+type decimal delta 0.01 digits 10 money_t;      // Pennies, up to 99999999.99
+type decimal delta 0.001 digits 12 price_t;     // Mils precision
+type decimal delta 0.0001 digits 8 interest_t;  // Basis points
+
+// Usage
+money_t account_balance = 1234.56;
+money_t transaction = 42.99;
+account_balance = account_balance + transaction;  // Exactly 1277.55
+
+price_t stock_price = 123.456;
+interest_t rate = 0.0325;  // 3.25%
+\end{lstlisting}
+
+Fixed point types are ideal for:
+\begin{itemize}
+\item Financial calculations requiring exact decimal arithmetic
+\item Embedded systems with no floating point hardware
+\item Control systems requiring deterministic behavior
+\item Currency and monetary values
+\item Sensor readings with known precision
+\end{itemize}
+
+\textbf{Key Differences:}
+\begin{itemize}
+\item \textbf{Ordinary fixed point:} Requires explicit range, optimized for specific value ranges
+\item \textbf{Decimal fixed point:} Range derived from digits, optimized for decimal calculations
+\item \textbf{Floating point:} Approximate representation, wider range, variable precision
 \end{itemize}
 
 \subsection{Subtypes}

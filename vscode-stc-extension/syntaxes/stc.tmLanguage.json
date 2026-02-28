@@ -39,7 +39,7 @@
         },
         {
           "name": "keyword.type.stc",
-          "match": "\\b(range|modular|struct|union|enum)\\b"
+          "match": "\\b(range|modular|float|fixed|decimal|digits|delta|struct|union|enum)\\b"
         },
         {
           "name": "keyword.parameter.stc",
@@ -47,7 +47,7 @@
         },
         {
           "name": "keyword.contract.stc",
-          "match": "\\b(pre|post|invariant|assert|global|reads|writes)\\b"
+          "match": "\\b(pre|post|global|reads|writes|loop_invariant|loop_variant|type_invariant|assert)\\b"
         },
         {
           "name": "keyword.attribute.stc",
