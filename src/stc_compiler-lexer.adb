@@ -735,6 +735,8 @@ is
       Reserved_Words_Table.Insert ("at", At_Token); --  attribute
       Reserved_Words_Table.Insert ("assert", Assert_Token);
       Reserved_Words_Table.Insert ("auto", Assert_Token);
+      Reserved_Words_Table.Insert ("bit", Bit_Token);  --  single-bit field attribute
+      Reserved_Words_Table.Insert ("bits", Bits_Token);  --  multi-bit field attribute
       Reserved_Words_Table.Insert ("bool", Bool_Token);
       Reserved_Words_Table.Insert ("break", Break_Token);
       Reserved_Words_Table.Insert ("case", Case_Token);
@@ -771,6 +773,7 @@ is
       Reserved_Words_Table.Insert ("mod", Mod_Token);
       Reserved_Words_Table.Insert ("modular", Modular_Token);
       Reserved_Words_Table.Insert ("module", Module_Token);
+      Reserved_Words_Table.Insert ("offset", Offset_Token);  --  bit field offset attribute
       Reserved_Words_Table.Insert ("out", Out_Token);
       Reserved_Words_Table.Insert ("packed", Packed_Token); --  attribute
       Reserved_Words_Table.Insert ("post", Post_Token); --  attribute

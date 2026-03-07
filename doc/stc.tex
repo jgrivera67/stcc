@@ -121,18 +121,19 @@ The lexical structure of \emph{stC} consists of the following token types:
 The following identifiers are reserved as keywords and cannot be used as identifiers:
 
 \begin{lstlisting}
-as              assert          auto            bool            break
-case            char            compile_if      const           continue
-convention      decimal         default         delta           digits
-do              else            enum            false           first
-fixed           float           for             foreign         global
-goto            if              import          in              inout
-lambda          last            loop_invariant  loop_variant    modular
-module          out             packed          post            pre
-private         range           reads           renames         return
-size            sizeof          static          struct          subtype
-switch          true            type            type_invariant  union
-void            volatile        while           writes
+as              assert          auto            bit             bits
+bool            break           case            char            compile_if
+const           continue        convention      decimal         default
+delta           digits          do              else            enum
+false           first           fixed           float           for
+foreign         global          goto            if              import
+in              inout           lambda          last            loop_invariant
+loop_variant    modular         module          offset          out
+packed          post            pre             private         range
+reads           renames         return          size            sizeof
+static          struct          subtype         switch          true
+type            type_invariant  union           void            volatile
+while           writes
 \end{lstlisting}
 
 Note: \verb'machine_width' is not a keyword but a built-in constant (see section on Built-in Constants).
@@ -331,13 +332,23 @@ module stdint {
    "enum" "{" <enum-entry> ("," <enum-entry>)* "}"
 
 <struct-field-declaration> ::=
-   <type-identifier> <struct-field-declarator> ("=" <constant-expression>)?
+   <type-identifier> <struct-field-declarator>
+      (<field-attributes>)? ("=" <constant-expression>)?
 
 <struct-field-declarator> ::=
    ("*")? <struct-field-identifier>
             ("[" <constant-integer-expression> "]")*
 
 <struct-field-identifier> ::= "<identifier>"
+
+<field-attributes> ::=
+   ("[[" <field-attribute> "]]")+
+
+<field-attribute> ::=
+   ("offset" "(" <constant-integer-expression> ")")?
+      ("bit" "(" <constant-integer-expression> ")" |
+       "bits" "(" <constant-integer-expression> ".." <constant-integer-expression> ")") |
+   "volatile"
 
 <enum-entry> ::=
    <enum-entry-identifier> ("=" <constant-integer-expression>)?

@@ -38,6 +38,8 @@ private
       Asterisk_Op_Token,
       Auto_Token,
       Binary_Integer_Literal_Token,
+      Bit_Token,
+      Bits_Token,
       Bitwise_Not_Op_Token,
       Bitwise_Or_Op_Token,
       Bitwise_Xor_Op_Token,
@@ -103,6 +105,7 @@ private
       Modular_Token,
       Module_Token,
       Modulo_Op_Token,
+      Offset_Token,
       Out_Token,
       Packed_Token,
       Plus_Op_Token,
@@ -189,6 +192,7 @@ private
 
    type Identifier_Type is limited record
       Kind : Identifier_Kind_Type := Invalid_Identifier;
+      Name : String_Pointer_Type := null;  --  Identifier name string
       Declaration : AST_Node_Pointer_Type := null;
       Scope : AST_Node_Pointer_Type := null; --  Pointer to Statement_Block_Node if local scope
    end record;
@@ -210,6 +214,7 @@ private
       AST_Binary_Expression_Node,
       AST_Compilation_Unit_Node,
       AST_Do_While_Node,
+      AST_Field_Attribute_Node,
       AST_For_Node,
       AST_Function_Call_Node,
       AST_Function_Declaration_Node,
@@ -218,6 +223,7 @@ private
       AST_If_Node,
       AST_Literal_Node,
       AST_Statement_Block_Node,
+      AST_Struct_Field_Node,
       AST_Switch_Node,
       AST_Switch_Case_Node,
       AST_Switch_Default_Node,
@@ -352,14 +358,36 @@ private
          when AST_Type_Cast_Node =>
             Type_Reference : Identifier_Pointer_Type := null;
             Operand_Expression : AST_Node_Pointer_Type := null;
+         when AST_Field_Attribute_Node =>
+            Attribute_Kind : Token_Kind_Type := Offset_Token;  -- offset, bit, bits, volatile
+            Byte_Offset : AST_Node_Pointer_Type := null;       -- For offset(N)
+            Bit_Position : AST_Node_Pointer_Type := null;      -- For bit(N)
+            Bit_Start : AST_Node_Pointer_Type := null;         -- For bits(M..N)
+            Bit_End : AST_Node_Pointer_Type := null;           -- For bits(M..N)
+            Next_Attribute : AST_Node_Pointer_Type := null;     -- For multiple attributes
+         when AST_Struct_Field_Node =>
+            Field_Type : Identifier_Pointer_Type := null;
+            Field_Name : Identifier_Pointer_Type := null;
+            Is_Pointer : Boolean := False;
+            Array_Dimensions : AST_Node_Pointer_Type := null;
+            Default_Value : AST_Node_Pointer_Type := null;
+            Field_Attributes : AST_Node_Pointer_Type := null;  -- Points to AST_Field_Attribute_Node chain
+            Next_Field : AST_Node_Pointer_Type := null;
          when AST_Type_Declaration_Node =>
             Type_Name : Identifier_Pointer_Type := null;
             Type_Body : AST_Node_Pointer_Type := null;
+            Type_Attributes : AST_Node_Pointer_Type := null;   -- For [[packed]], [[at(addr)]], etc.
          when AST_Unary_Expression_Node =>
             Unary_Operator : AST_Operator_Type := AST_Invalid_Op;
             Operand : AST_Node_Pointer_Type := null;
          when AST_Variable_Declaration_Node =>
             Variable_Name : Identifier_Pointer_Type := null;
+            Variable_Type : Identifier_Pointer_Type := null;
+            Var_Is_Pointer : Boolean := False;
+            Var_Is_Const : Boolean := False;
+            Var_Is_Volatile : Boolean := False;
+            Var_Init_Value : AST_Node_Pointer_Type := null;
+            Variable_Attributes : AST_Node_Pointer_Type := null;  -- For [[at(address)]], etc.
          when AST_Variable_Reference_Node =>
             Variable : AST_Node_Pointer_Type := null;
          when AST_While_Node =>
