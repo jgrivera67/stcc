@@ -3,3 +3,6 @@
 
 # Ada Library Information
 *.ali
+
+# Temporary Claude-generated notes (not for repo history)
+doc/claude_tmp_generated/

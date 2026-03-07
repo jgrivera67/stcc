@@ -29,11 +29,19 @@
 %\linenumbers
 
 \begin{document}
-\title{The \emph{Strong-Typed C (stC)} Programming Language}
-\author{Germ\'an Rivera \\
-        \texttt jgrivera67@gmail.com}
-\date{\today}
-\maketitle
+\begin{titlepage}
+   \centering
+   \vspace*{2cm}
+   \includegraphics[width=0.45\textwidth]{logo/stc-forged-logo.png}\\[1.5cm]
+   {\Huge\bfseries The \emph{Strong-Typed C (stC)}\\[0.4cm]
+    Programming Language\par}
+   \vspace{1.5cm}
+   {\Large Germ\'an Rivera\par}
+   \vspace{0.4cm}
+   {\large \texttt{jgrivera67@gmail.com}\par}
+   \vfill
+   {\large \today\par}
+\end{titlepage}
 
 \frontmatter
 \tableofcontents
@@ -345,7 +353,7 @@ module stdint {
    ("[[" <field-attribute> "]]")+
 
 <field-attribute> ::=
-   ("offset" "(" <constant-integer-expression> ")")?
+   "offset" "(" <constant-integer-expression> ")"
       ("bit" "(" <constant-integer-expression> ")" |
        "bits" "(" <constant-integer-expression> ".." <constant-integer-expression> ")") |
    "volatile"
@@ -925,6 +933,130 @@ type enum {
 } color_t;
 
 color_t my_color = red;
+\end{lstlisting}
+
+\subsection{Bit Fields and Memory-Mapped I/O Registers}
+
+\emph{stC} supports precise bit-level layout control for struct fields using Ada/SPARK-style representation clauses. This feature is essential for embedded systems programming, particularly for Memory-Mapped I/O (MMIO) register definitions where exact hardware layout must be specified.
+
+\subsubsection{Field-Level Bit Attributes}
+
+Field attributes specify the exact byte offset and bit position for each struct field using \verb'[[offset(...)]]' combined with \verb'bit(...)' or \verb'bits(...)':
+
+\begin{lstlisting}
+type modular 1 << 8 uint8_t;
+
+type struct {
+  bool enable [[offset(0) bit(0)]];
+  bool interrupt_enable [[offset(0) bit(1)]];
+  uint8_t mode [[offset(0) bits(2..4)]];      // 3 bits
+  uint8_t reserved [[offset(0) bits(5..7)]];  // 3 bits
+} control_reg_t [[packed]];
+\end{lstlisting}
+
+\textbf{Attribute Syntax:}
+\begin{itemize}
+\item \verb'[[offset(N) bit(M)]]' -- Field at byte N, single bit M (for booleans)
+\item \verb'[[offset(N) bits(M..P)]]' -- Field at byte N, bits M through P (for multi-bit fields)
+\item \verb'[[volatile]]' -- Field represents hardware register (suppress optimization)
+\end{itemize}
+
+\textbf{Important Rules:}
+\begin{itemize}
+\item \verb'offset' is \textbf{required} when using \verb'bit' or \verb'bits' (avoids C bit field ambiguity)
+\item Either \textbf{all} fields in a struct have explicit \verb'[[offset(...)]]' attributes or \textbf{none} do
+\item No mixing of explicit and implicit layout in the same struct
+\item \textbf{Struct WITHOUT offset/bits attributes:} uses C layout (compiler applies normal struct packing rules)
+\item \textbf{Struct WITH offset/bits attributes:} uses explicit Ada representation (programmer controls every bit position)
+\end{itemize}
+
+\subsubsection{Type-Level Attributes}
+
+Type attributes apply to the entire struct:
+
+\begin{itemize}
+\item \verb'[[packed]]' -- No padding between fields, minimal size
+\item \verb'[[at(address)]]' -- Map type to specific memory address (for MMIO)
+\item \verb'[[volatile]]' -- All fields are volatile (hardware registers)
+\end{itemize}
+
+\subsubsection{Complete MMIO Register Example}
+
+Example of a 32-bit GPIO control register:
+
+\begin{lstlisting}
+type modular 1 << 32 uint32_t;
+type range 0 .. 7 uint3_t;
+type range 0 .. 15 uint4_t;
+type range 0 .. 255 uint8_t;
+
+// GPIO Control Register (32-bit at 0x40000000)
+type struct {
+  bool port_enable [[offset(0) bit(0)]];       // Bit 0
+  bool output_enable [[offset(0) bit(1)]];     // Bit 1
+  bool pull_up [[offset(0) bit(2)]];           // Bit 2
+  bool pull_down [[offset(0) bit(3)]];         // Bit 3
+  uint4_t drive_strength [[offset(0) bits(4..7)]];  // Bits 4-7
+  uint8_t reserved1 [[offset(1) bits(0..7)]];  // Bits 8-15
+  uint8_t pin_value [[offset(2) bits(0..7)]];  // Bits 16-23
+  uint8_t reserved2 [[offset(3) bits(0..7)]];  // Bits 24-31
+} gpio_control_t [[packed]] [[at(0x40000000)]] [[volatile]];
+
+// Access the memory-mapped register
+void gpio_init() {
+  gpio_control_t* gpio = 0x40000000;
+  gpio->port_enable = true;
+  gpio->output_enable = true;
+  gpio->drive_strength = 7;  // Maximum drive strength
+  gpio->pull_up = false;
+  gpio->pull_down = false;
+}
+\end{lstlisting}
+
+\textbf{Maps to Ada/SPARK:}
+
+The stC bit field definition above transpiles to Ada with exact representation clauses:
+
+\begin{lstlisting}[language=Ada]
+type GPIO_Control_T is record
+  Port_Enable     : Boolean;
+  Output_Enable   : Boolean;
+  Pull_Up         : Boolean;
+  Pull_Down       : Boolean;
+  Drive_Strength  : Unsigned_4;
+  Reserved1       : Unsigned_8;
+  Pin_Value       : Unsigned_8;
+  Reserved2       : Unsigned_8;
+end record;
+
+for GPIO_Control_T use record
+  Port_Enable    at 0 range 0 .. 0;
+  Output_Enable  at 0 range 1 .. 1;
+  Pull_Up        at 0 range 2 .. 2;
+  Pull_Down      at 0 range 3 .. 3;
+  Drive_Strength at 0 range 4 .. 7;
+  Reserved1      at 1 range 0 .. 7;
+  Pin_Value      at 2 range 0 .. 7;
+  Reserved2      at 3 range 0 .. 7;
+end record;
+
+for GPIO_Control_T'Size use 32;
+
+GPIO : GPIO_Control_T
+   with Address => System.Storage_Elements.To_Address (16#40000000#),
+        Volatile;
+\end{lstlisting}
+
+\subsubsection{Regular Structs Without Bit Fields}
+
+For regular structs that don't require precise bit layout, simply omit the bit field attributes:
+
+\begin{lstlisting}
+type struct {
+  bool flag;        // Standard C layout
+  uint8_t count;    // Standard alignment
+  uint32_t value;   // Standard alignment
+} config_t;
 \end{lstlisting}
 
 \section{Arrays}
