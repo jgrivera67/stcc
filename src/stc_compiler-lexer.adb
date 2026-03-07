@@ -235,9 +235,28 @@ is
       end if;
 
       if Lexer_Obj.Lookahead_Char = '.' then
-         Token_Obj.String_Buffer (Cursor) := '.';
-         Get_Next_Char (Compiler_Obj);
-         Scan_Floating_Point_Literal_Fraction_Part (Compiler_Obj, Token_Obj, Cursor + 1);
+         --  Peek at the character after '.' to distinguish float (N.digit) from range (N..)
+         declare
+            Next_Char : Character;
+            End_Of_Line : Boolean;
+         begin
+            if Ada.Text_IO.End_Of_File (Compiler_Obj.File_Obj) then
+               Next_Char := ASCII.NUL;
+            else
+               Ada.Text_IO.Look_Ahead (Compiler_Obj.File_Obj, Next_Char, End_Of_Line);
+            end if;
+
+            if Next_Char = '.' then
+               --  This is "N.." — return integer, leave Lookahead_Char = '.' for next token
+               Token_Obj.String_Length := Cursor - 1;
+               Token_Obj.Kind := Decimal_Integer_Literal_Token;
+            else
+               --  This is a float literal (e.g. 3.14)
+               Token_Obj.String_Buffer (Cursor) := '.';
+               Get_Next_Char (Compiler_Obj);
+               Scan_Floating_Point_Literal_Fraction_Part (Compiler_Obj, Token_Obj, Cursor + 1);
+            end if;
+         end;
       else
          Token_Obj.String_Length := Cursor - 1;
          Token_Obj.Kind := Decimal_Integer_Literal_Token;
@@ -410,9 +429,28 @@ is
                   Get_Next_Char (Compiler_Obj);
                   Scan_Binary_Integer_Literal (Compiler_Obj, Token_Obj);
                elsif Lexer_Obj.Lookahead_Char = '.' then
-                  Token_Obj.String_Buffer (1 .. 2) := "0.";
-                  Get_Next_Char (Compiler_Obj);
-                  Scan_Floating_Point_Literal_Fraction_Part (Compiler_Obj, Token_Obj, Initial_Cursor => 3);
+                  --  Peek to distinguish 0.N (float) from 0.. (integer + range)
+                  declare
+                     Next_Char : Character;
+                     End_Of_Line : Boolean;
+                  begin
+                     if Ada.Text_IO.End_Of_File (Compiler_Obj.File_Obj) then
+                        Next_Char := ASCII.NUL;
+                     else
+                        Ada.Text_IO.Look_Ahead (Compiler_Obj.File_Obj, Next_Char, End_Of_Line);
+                     end if;
+
+                     if Next_Char = '.' then
+                        --  This is "0.." — return 0 as integer, leave Lookahead_Char = '.'
+                        Token_Obj.String_Buffer (1) := '0';
+                        Token_Obj.String_Length := 1;
+                        Token_Obj.Kind := Decimal_Integer_Literal_Token;
+                     else
+                        Token_Obj.String_Buffer (1 .. 2) := "0.";
+                        Get_Next_Char (Compiler_Obj);
+                        Scan_Floating_Point_Literal_Fraction_Part (Compiler_Obj, Token_Obj, Initial_Cursor => 3);
+                     end if;
+                  end;
                elsif Is_Word_Char (Lexer_Obj.Lookahead_Char) then
                   Log_Compiler_Error (Compiler_Obj, "Unexpected character after 0: '" & Lexer_Obj.Lookahead_Char & "'");
                   raise Program_Error;
