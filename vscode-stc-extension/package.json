@@ -15,7 +15,7 @@
     "Strong-Typed C",
     "systems programming"
   ],
-  "main": "./out/client/src/extension.js",
+  "main": "./client/out/extension.js",
   "contributes": {
     "languages": [
       {
@@ -86,6 +86,7 @@
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -b",
     "watch": "tsc -b -w",
+    "dev": "node dev-watch.js",
     "postinstall": "cd client && npm install && cd ../server && npm install && cd .."
   },
   "devDependencies": {

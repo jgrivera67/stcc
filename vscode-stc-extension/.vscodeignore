@@ -4,6 +4,7 @@ client/out/test/**
 server/out/test/**
 client/src/**
 server/src/**
+out/**
 **/*.map
 .gitignore
 tsconfig.json

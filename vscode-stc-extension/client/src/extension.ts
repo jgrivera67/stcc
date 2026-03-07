@@ -14,7 +14,7 @@ export function activate(context: ExtensionContext) {
 
   // The server is implemented in node
   const serverModule = context.asAbsolutePath(
-    path.join('out', 'server', 'src', 'server.js')
+    path.join('server', 'out', 'server.js')
   );
 
   console.log('Server module path:', serverModule);

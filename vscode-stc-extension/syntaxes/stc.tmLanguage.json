@@ -51,11 +51,15 @@
         },
         {
           "name": "keyword.attribute.stc",
-          "match": "\\b(first|last|range|size)\\b"
+          "match": "\\b(first|last|size)\\b"
+        },
+        {
+          "name": "keyword.attribute.hardware.stc",
+          "match": "\\b(offset|bit|bits|at)\\b"
         },
         {
           "name": "keyword.other.compile-time.stc",
-          "match": "\\b(compile_if|convention|renames|as|lambda|size)\\b"
+          "match": "\\b(compile_if|convention|renames|as|lambda)\\b"
         }
       ]
     },
