@@ -119,6 +119,28 @@ package body STC_Compiler.Parser is
    --  Helper procedures for parsing different constructs
    --
 
+   procedure Stack_Push (Stack_Top : in out AST_Node_Pointer_Type;
+                         Node : AST_Node_Pointer_Type)
+      with Pre => Node /= null and then
+                  Node.Next_In_Stack = null and then
+                  Node /= Stack_Top,
+           Post => Stack_Top = Node and then
+                   Node.Next_In_Stack = Stack_Top'Old;
+
+   procedure Stack_Pop (Stack_Top : in out AST_Node_Pointer_Type;
+                        Stack_Bottom : AST_Node_Pointer_Type;
+                        Node : out AST_Node_Pointer_Type)
+      with Pre => Stack_Top /= Stack_Bottom,
+           Post => Node = Stack_Top'Old and then
+                   Node.Next_In_Stack = null;
+
+   --  Returns True if the token kind can appear as a type name (identifier or built-in keyword type)
+   function Is_Type_Name_Token (Kind : Token_Kind_Type) return Boolean is
+      (Kind = Identifier_Token or else
+       Kind = Bool_Token or else
+       Kind = Char_Token or else
+       Kind = Void_Token);
+
    procedure Parse_Statement (Compiler_Obj : in out Compiler_Type;
                               Statement_Node : out AST_Node_Pointer_Type);
 
@@ -297,6 +319,21 @@ package body STC_Compiler.Parser is
       end case;
    end Parse_Statement;
 
+   --  Create a new identifier from the current token's string and the given kind
+   function Make_Identifier (Compiler_Obj : Compiler_Type;
+                              Kind         : Identifier_Kind_Type)
+                              return Identifier_Pointer_Type
+   is
+      Parser_Obj : Parser_Type renames Compiler_Obj.Parser_Obj;
+      Current_Token_Obj : Token_Type renames
+         Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index);
+      Id : constant Identifier_Pointer_Type := new Identifier_Type;
+   begin
+      Id.Kind := Kind;
+      Id.Name := new String'(Current_Token_Obj.String_Buffer (1 .. Current_Token_Obj.String_Length));
+      return Id;
+   end Make_Identifier;
+
    procedure Parse_Type_Declaration (Compiler_Obj : in out Compiler_Type;
                                      Type_Node : out AST_Node_Pointer_Type) is
       Parser_Obj : Parser_Type renames Compiler_Obj.Parser_Obj;
@@ -361,48 +398,83 @@ package body STC_Compiler.Parser is
             Expect_Token (Compiler_Obj, Left_Curly_Brace_Token);
 
             --  Parse field declarations: (<type-id> ["*"] <field-id> ["[" expr "]"]* ["=" expr] ";")+
-            loop
-               exit when Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Right_Curly_Brace_Token;
+            declare
+               First_Field : AST_Node_Pointer_Type := null;
+               Last_Field  : AST_Node_Pointer_Type := null;
+            begin
+               loop
+                  exit when Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Right_Curly_Brace_Token;
 
-               --  Parse type identifier
-               if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /= Identifier_Token then
-                  Log_Compiler_Error (Compiler_Obj, "Expected type identifier in struct/union field");
-                  raise Program_Error;
-               end if;
-               --  TODO: Store field type
-               Lexer.Get_Next_Token (Compiler_Obj);
+                  declare
+                     Field_Node       : AST_Node_Pointer_Type;
+                     Field_Type_Id    : Identifier_Pointer_Type;
+                     Field_Name_Id    : Identifier_Pointer_Type;
+                     Field_Is_Pointer : Boolean := False;
+                     Field_Attrs      : AST_Node_Pointer_Type := null;
+                  begin
+                     --  Parse type identifier (may be keyword like 'bool' or user-defined name)
+                     if not Is_Type_Name_Token (Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind) then
+                        Log_Compiler_Error (Compiler_Obj, "Expected type identifier in struct/union field");
+                        raise Program_Error;
+                     end if;
+                     Field_Type_Id := Make_Identifier (Compiler_Obj, Type_Identifier);
+                     Lexer.Get_Next_Token (Compiler_Obj);
 
-               --  Check for optional pointer "*"
-               if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Asterisk_Op_Token then
-                  --  TODO: Mark as pointer field
-                  Lexer.Get_Next_Token (Compiler_Obj);
-               end if;
+                     --  Check for optional pointer "*"
+                     if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Asterisk_Op_Token then
+                        Field_Is_Pointer := True;
+                        Lexer.Get_Next_Token (Compiler_Obj);
+                     end if;
 
-               --  Parse field identifier
-               if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /= Identifier_Token then
-                  Log_Compiler_Error (Compiler_Obj, "Expected field identifier");
-                  raise Program_Error;
-               end if;
-               --  TODO: Store field name
-               Lexer.Get_Next_Token (Compiler_Obj);
+                     --  Parse field identifier
+                     if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /= Identifier_Token then
+                        Log_Compiler_Error (Compiler_Obj, "Expected field identifier");
+                        raise Program_Error;
+                     end if;
+                     Field_Name_Id := Make_Identifier (Compiler_Obj, Variable_Identifier);
+                     Lexer.Get_Next_Token (Compiler_Obj);
 
-               --  Parse optional array dimensions "[" expr "]"*
-               while Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Left_Square_Parenthesis_Token loop
-                  Lexer.Get_Next_Token (Compiler_Obj);
-                  Parse_Expression (Compiler_Obj);
-                  Expect_Token (Compiler_Obj, Right_Square_Parenthesis_Token);
-                  --  TODO: Store array dimension
+                     --  Create field node now that we have names
+                     Field_Node := new AST_Node_Type (AST_Struct_Field_Node);
+                     Field_Node.Field_Type  := Field_Type_Id;
+                     Field_Node.Field_Name  := Field_Name_Id;
+                     Field_Node.Is_Pointer  := Field_Is_Pointer;
+
+                     --  Parse optional array dimensions "[" expr "]"*
+                     while Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind =
+                        Left_Square_Parenthesis_Token
+                     loop
+                        Lexer.Get_Next_Token (Compiler_Obj);
+                        Parse_Expression (Compiler_Obj);
+                        Expect_Token (Compiler_Obj, Right_Square_Parenthesis_Token);
+                        --  TODO: Store array dimension in Field_Node.Array_Dimensions
+                     end loop;
+
+                     --  Parse optional field attributes [[offset(...) bit(...)]], [[volatile]], etc.
+                     Parse_Field_Attributes (Compiler_Obj, Field_Attrs);
+                     Field_Node.Field_Attributes := Field_Attrs;
+
+                     --  Parse optional default value "= <constant-expression>"
+                     if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Assignment_Op_Token then
+                        Lexer.Get_Next_Token (Compiler_Obj);
+                        Parse_Expression (Compiler_Obj);
+                        Stack_Pop (Parser_Obj.Operand_Stack_Top, null, Field_Node.Default_Value);
+                     end if;
+
+                     Expect_Token (Compiler_Obj, Semicolon_Token);
+
+                     --  Link field into chain
+                     if Last_Field = null then
+                        First_Field := Field_Node;
+                     else
+                        Last_Field.Next_Field := Field_Node;
+                     end if;
+                     Last_Field := Field_Node;
+                  end;
                end loop;
 
-               --  Parse optional default value "= <constant-expression>"
-               if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Assignment_Op_Token then
-                  Lexer.Get_Next_Token (Compiler_Obj);
-                  Parse_Expression (Compiler_Obj);
-                  --  TODO: Store default value
-               end if;
-
-               Expect_Token (Compiler_Obj, Semicolon_Token);
-            end loop;
+               Type_Node.Type_Body := First_Field;
+            end;
 
             Expect_Token (Compiler_Obj, Right_Curly_Brace_Token);
 
@@ -445,11 +517,176 @@ package body STC_Compiler.Parser is
          Log_Compiler_Error (Compiler_Obj, "Expected type name");
          raise Program_Error;
       end if;
-      --  TODO: Store type name
+      Type_Node.Type_Name := Make_Identifier (Compiler_Obj, Type_Identifier);
       Lexer.Get_Next_Token (Compiler_Obj);
+
+      --  Parse optional type-level attributes [[at(addr)]]
+      declare
+         Type_Attributes : AST_Node_Pointer_Type := null;
+      begin
+         Parse_Type_Attributes (Compiler_Obj, Type_Attributes);
+         Type_Node.Type_Attributes := Type_Attributes;
+      end;
 
       Expect_Token (Compiler_Obj, Semicolon_Token);
    end Parse_Type_Declaration;
+
+   procedure Parse_Field_Attributes (Compiler_Obj : in out Compiler_Type;
+                                     Attr_List : out AST_Node_Pointer_Type)
+   is
+      Parser_Obj : Parser_Type renames Compiler_Obj.Parser_Obj;
+      Attr_Node : AST_Node_Pointer_Type;
+      Last_Attr : AST_Node_Pointer_Type := null;
+   begin
+      Attr_List := null;
+
+      --  Parse multiple [[...]] attributes
+      while Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Left_Double_Square_Parenthesis_Token loop
+         Lexer.Get_Next_Token (Compiler_Obj);  --  Skip [[
+
+         --  Create field attribute node
+         Attr_Node := new AST_Node_Type (AST_Field_Attribute_Node);
+
+         --  Parse attribute kind
+         case Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind is
+            when Offset_Token =>
+               --  Parse: offset(byte) bit(n) or offset(byte) bits(start..end)
+               Attr_Node.Attribute_Kind := Offset_Token;
+               Lexer.Get_Next_Token (Compiler_Obj);  --  Skip 'offset'
+               Expect_Token (Compiler_Obj, Left_Parenthesis_Token);
+               Parse_Expression (Compiler_Obj);
+               Stack_Pop (Parser_Obj.Operand_Stack_Top, null, Attr_Node.Byte_Offset);
+               Expect_Token (Compiler_Obj, Right_Parenthesis_Token);
+
+               --  Expect bit(...) or bits(...)
+               if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Bit_Token then
+                  --  Parse: bit(n)
+                  Lexer.Get_Next_Token (Compiler_Obj);  --  Skip 'bit'
+                  Expect_Token (Compiler_Obj, Left_Parenthesis_Token);
+                  Parse_Expression (Compiler_Obj);
+                  Stack_Pop (Parser_Obj.Operand_Stack_Top, null, Attr_Node.Bit_Position);
+                  Expect_Token (Compiler_Obj, Right_Parenthesis_Token);
+
+               elsif Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Bits_Token then
+                  --  Parse: bits(start..end)
+                  Lexer.Get_Next_Token (Compiler_Obj);  --  Skip 'bits'
+                  Expect_Token (Compiler_Obj, Left_Parenthesis_Token);
+                  Parse_Expression (Compiler_Obj);
+                  Stack_Pop (Parser_Obj.Operand_Stack_Top, null, Attr_Node.Bit_Start);
+                  Expect_Token (Compiler_Obj, Range_Op_Token);
+                  Parse_Expression (Compiler_Obj);
+                  Stack_Pop (Parser_Obj.Operand_Stack_Top, null, Attr_Node.Bit_End);
+                  Expect_Token (Compiler_Obj, Right_Parenthesis_Token);
+
+               else
+                  Log_Compiler_Error (Compiler_Obj, "Expected 'bit' or 'bits' after 'offset'");
+                  raise Program_Error;
+               end if;
+
+            when others =>
+               Log_Compiler_Error (Compiler_Obj, "Invalid field attribute (expected 'offset')");
+               raise Program_Error;
+         end case;
+
+         Expect_Token (Compiler_Obj, Right_Double_Square_Parenthesis_Token);
+
+         --  Link to attribute list
+         if Attr_List = null then
+            Attr_List := Attr_Node;
+         else
+            Last_Attr.Next_Attribute := Attr_Node;
+         end if;
+         Last_Attr := Attr_Node;
+      end loop;
+   end Parse_Field_Attributes;
+
+   procedure Parse_Type_Attributes (Compiler_Obj : in out Compiler_Type;
+                                    Attr_List : out AST_Node_Pointer_Type)
+   is
+      Parser_Obj : Parser_Type renames Compiler_Obj.Parser_Obj;
+      Attr_Node : AST_Node_Pointer_Type;
+      Last_Attr : AST_Node_Pointer_Type := null;
+   begin
+      Attr_List := null;
+
+      --  Parse multiple [[...]] attributes
+      while Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Left_Double_Square_Parenthesis_Token loop
+         Lexer.Get_Next_Token (Compiler_Obj);  --  Skip [[
+
+         --  Create type attribute node (reuse AST_Field_Attribute_Node for type attributes)
+         Attr_Node := new AST_Node_Type (AST_Field_Attribute_Node);
+
+         --  Parse attribute kind
+         case Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind is
+            when At_Token =>
+               --  Parse: [[at(address)]]
+               Attr_Node.Attribute_Kind := At_Token;
+               Lexer.Get_Next_Token (Compiler_Obj);  --  Skip 'at'
+               Expect_Token (Compiler_Obj, Left_Parenthesis_Token);
+               Parse_Expression (Compiler_Obj);
+               Stack_Pop (Parser_Obj.Operand_Stack_Top, null, Attr_Node.Byte_Offset);
+               Expect_Token (Compiler_Obj, Right_Parenthesis_Token);
+
+            when others =>
+               Log_Compiler_Error (Compiler_Obj, "Invalid type attribute (expected 'at')");
+               raise Program_Error;
+         end case;
+
+         Expect_Token (Compiler_Obj, Right_Double_Square_Parenthesis_Token);
+
+         --  Link to attribute list
+         if Attr_List = null then
+            Attr_List := Attr_Node;
+         else
+            Last_Attr.Next_Attribute := Attr_Node;
+         end if;
+         Last_Attr := Attr_Node;
+      end loop;
+   end Parse_Type_Attributes;
+
+   procedure Parse_Variable_Attributes (Compiler_Obj : in out Compiler_Type;
+                                        Attr_List : out AST_Node_Pointer_Type)
+   is
+      Parser_Obj : Parser_Type renames Compiler_Obj.Parser_Obj;
+      Attr_Node : AST_Node_Pointer_Type;
+      Last_Attr : AST_Node_Pointer_Type := null;
+   begin
+      Attr_List := null;
+
+      --  Parse multiple [[...]] attributes
+      while Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Left_Double_Square_Parenthesis_Token loop
+         Lexer.Get_Next_Token (Compiler_Obj);  --  Skip [[
+
+         --  Create variable attribute node (reuse AST_Field_Attribute_Node for variable attributes)
+         Attr_Node := new AST_Node_Type (AST_Field_Attribute_Node);
+
+         --  Parse attribute kind
+         case Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind is
+            when At_Token =>
+               --  Parse: [[at(address)]]
+               Attr_Node.Attribute_Kind := At_Token;
+               Lexer.Get_Next_Token (Compiler_Obj);  --  Skip 'at'
+               Expect_Token (Compiler_Obj, Left_Parenthesis_Token);
+               Parse_Expression (Compiler_Obj);
+               Stack_Pop (Parser_Obj.Operand_Stack_Top, null, Attr_Node.Byte_Offset);
+               Expect_Token (Compiler_Obj, Right_Parenthesis_Token);
+
+            when others =>
+               Log_Compiler_Error (Compiler_Obj, "Invalid variable attribute (expected 'at')");
+               raise Program_Error;
+         end case;
+
+         Expect_Token (Compiler_Obj, Right_Double_Square_Parenthesis_Token);
+
+         --  Link to attribute list
+         if Attr_List = null then
+            Attr_List := Attr_Node;
+         else
+            Last_Attr.Next_Attribute := Attr_Node;
+         end if;
+         Last_Attr := Attr_Node;
+      end loop;
+   end Parse_Variable_Attributes;
 
    procedure Parse_Contract_Attribute (Compiler_Obj : in out Compiler_Type;
                                        Contract_Type : out Token_Kind_Type;
@@ -601,26 +838,280 @@ package body STC_Compiler.Parser is
             Parse_Subtype_Declaration (Compiler_Obj, Declaration_Node);
 
          when Const_Token =>
-            --  TODO: Parse constant declaration
-            Lexer.Get_Next_Token (Compiler_Obj);
-            Log_Message ("Parsing constant declaration (not yet implemented)");
+            --  Parse constant declaration
+            --  Syntax: const <type> <name> "=" <expr> ";"
+            declare
+               Var_Node    : AST_Node_Pointer_Type;
+               Var_Type_Id : Identifier_Pointer_Type;
+               Var_Name_Id : Identifier_Pointer_Type;
+            begin
+               Lexer.Get_Next_Token (Compiler_Obj);  --  Skip 'const'
+
+               --  Parse type identifier (may be keyword like 'bool' or user-defined name)
+               if not Is_Type_Name_Token (Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind) then
+                  Log_Compiler_Error (Compiler_Obj, "Expected type identifier after 'const'");
+                  raise Program_Error;
+               end if;
+               Var_Type_Id := Make_Identifier (Compiler_Obj, Type_Identifier);
+               Lexer.Get_Next_Token (Compiler_Obj);
+
+               --  Parse constant name
+               if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /= Identifier_Token then
+                  Log_Compiler_Error (Compiler_Obj, "Expected constant name");
+                  raise Program_Error;
+               end if;
+               Var_Name_Id := Make_Identifier (Compiler_Obj, Constant_Identifier);
+               Lexer.Get_Next_Token (Compiler_Obj);
+
+               --  Constants require an initializer
+               if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /= Assignment_Op_Token then
+                  Log_Compiler_Error (Compiler_Obj, "Expected '=' in constant declaration");
+                  raise Program_Error;
+               end if;
+               Lexer.Get_Next_Token (Compiler_Obj);
+               Parse_Expression (Compiler_Obj);
+
+               --  Create const variable declaration node
+               Var_Node := new AST_Node_Type (AST_Variable_Declaration_Node);
+               Var_Node.Var_Is_Const := True;
+               Var_Node.Var_Is_Volatile := False;
+               Var_Node.Var_Is_Pointer := False;
+               Var_Node.Variable_Type := Var_Type_Id;
+               Var_Node.Variable_Name := Var_Name_Id;
+               Stack_Pop (Parser_Obj.Operand_Stack_Top, null, Var_Node.Var_Init_Value);
+
+               Expect_Token (Compiler_Obj, Semicolon_Token);
+               Declaration_Node := Var_Node;
+            end;
+
+         when Volatile_Token =>
+            --  Parse volatile variable declaration
+            --  Syntax: volatile <type> ["*"] <name> [[[at(addr)]]] ["=" <init>] ";"
+            declare
+               Var_Node    : AST_Node_Pointer_Type;
+               Var_Type_Id : Identifier_Pointer_Type;
+               Var_Name_Id : Identifier_Pointer_Type;
+               Is_Pointer  : Boolean := False;
+            begin
+               Lexer.Get_Next_Token (Compiler_Obj);  --  Skip 'volatile'
+
+               --  Parse type identifier (may be keyword like 'bool' or user-defined name)
+               if not Is_Type_Name_Token (Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind) then
+                  Log_Compiler_Error (Compiler_Obj, "Expected type identifier after 'volatile'");
+                  raise Program_Error;
+               end if;
+               Var_Type_Id := Make_Identifier (Compiler_Obj, Type_Identifier);
+               Lexer.Get_Next_Token (Compiler_Obj);
+
+               --  Check for pointer "*"
+               if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Asterisk_Op_Token then
+                  Is_Pointer := True;
+                  Lexer.Get_Next_Token (Compiler_Obj);
+               end if;
+
+               --  Parse variable name
+               if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /= Identifier_Token then
+                  Log_Compiler_Error (Compiler_Obj, "Expected variable name");
+                  raise Program_Error;
+               end if;
+               Var_Name_Id := Make_Identifier (Compiler_Obj, Variable_Identifier);
+               Lexer.Get_Next_Token (Compiler_Obj);
+
+               --  Create variable declaration node
+               Var_Node := new AST_Node_Type (AST_Variable_Declaration_Node);
+               Var_Node.Var_Is_Pointer := Is_Pointer;
+               Var_Node.Var_Is_Const := False;
+               Var_Node.Var_Is_Volatile := True;
+               Var_Node.Variable_Type := Var_Type_Id;
+               Var_Node.Variable_Name := Var_Name_Id;
+
+               --  Parse optional [[at(address)]] attribute
+               if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind =
+                  Left_Double_Square_Parenthesis_Token
+               then
+                  Parse_Variable_Attributes (Compiler_Obj, Var_Node.Variable_Attributes);
+               end if;
+
+               --  Parse optional initialization "= <expression>"
+               if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Assignment_Op_Token then
+                  Lexer.Get_Next_Token (Compiler_Obj);
+                  Parse_Expression (Compiler_Obj);
+                  Stack_Pop (Parser_Obj.Operand_Stack_Top, null, Var_Node.Var_Init_Value);
+               end if;
+
+               Expect_Token (Compiler_Obj, Semicolon_Token);
+
+               Declaration_Node := Var_Node;
+            end;
 
          when Foreign_Token =>
             --  TODO: Parse foreign declaration
             Lexer.Get_Next_Token (Compiler_Obj);
             Log_Message ("Parsing foreign declaration (not yet implemented)");
 
-         when Identifier_Token =>
-            --  Could be variable or function declaration
-            --  TODO: Implement proper parsing
-            Lexer.Get_Next_Token (Compiler_Obj);
-            Log_Message ("Parsing variable/function declaration (not yet implemented)");
+         when Identifier_Token | Bool_Token | Char_Token =>
+            --  Parse variable or function declaration
+            --  Syntax: <type> ["*"] <name> [[[at(addr)]]] ["=" <init>] ";"
+            --      or: <type> <name> "(" ... ")" - function
+            declare
+               Var_Node    : AST_Node_Pointer_Type;
+               Var_Type_Id : Identifier_Pointer_Type;
+               Var_Name_Id : Identifier_Pointer_Type;
+               Is_Pointer  : Boolean := False;
+            begin
+               --  Parse type identifier
+               Var_Type_Id := Make_Identifier (Compiler_Obj, Type_Identifier);
+               Lexer.Get_Next_Token (Compiler_Obj);
+
+               --  Check for pointer "*"
+               if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Asterisk_Op_Token then
+                  Is_Pointer := True;
+                  Lexer.Get_Next_Token (Compiler_Obj);
+               end if;
+
+               --  If we see '(' here, the "type" we just parsed was actually a function name
+               --  whose return type was already consumed (e.g. void was skipped separately).
+               --  Skip the entire function body and return.
+               if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Left_Parenthesis_Token then
+                  Log_Message ("Skipping function declaration (not yet implemented)");
+                  while Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /=
+                        Left_Curly_Brace_Token and then
+                        Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /=
+                        End_Of_File_Token
+                  loop
+                     Lexer.Get_Next_Token (Compiler_Obj);
+                  end loop;
+                  if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Left_Curly_Brace_Token then
+                     declare
+                        Depth : Natural := 1;
+                     begin
+                        loop
+                           Lexer.Get_Next_Token (Compiler_Obj);
+                           exit when Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind =
+                                     End_Of_File_Token;
+                           if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind =
+                              Left_Curly_Brace_Token
+                           then
+                              Depth := Depth + 1;
+                           elsif Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind =
+                                 Right_Curly_Brace_Token
+                           then
+                              Depth := Depth - 1;
+                              exit when Depth = 0;
+                           end if;
+                        end loop;
+                        Lexer.Get_Next_Token (Compiler_Obj);  --  Consume closing '}'
+                     end;
+                  end if;
+                  return;
+               end if;
+
+               --  Parse variable/function name
+               if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /= Identifier_Token then
+                  Log_Compiler_Error (Compiler_Obj, "Expected variable or function name");
+                  raise Program_Error;
+               end if;
+               Var_Name_Id := Make_Identifier (Compiler_Obj, Variable_Identifier);
+               Lexer.Get_Next_Token (Compiler_Obj);
+
+               --  Check if this is a function (has opening parenthesis after the name)
+               if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Left_Parenthesis_Token then
+                  --  This is a function declaration (return_type name(...) {...})
+                  Log_Message ("Skipping non-void function declaration (not yet implemented)");
+                  while Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /=
+                        Left_Curly_Brace_Token and then
+                        Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /=
+                        End_Of_File_Token
+                  loop
+                     Lexer.Get_Next_Token (Compiler_Obj);
+                  end loop;
+                  if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Left_Curly_Brace_Token then
+                     declare
+                        Depth : Natural := 1;
+                     begin
+                        loop
+                           Lexer.Get_Next_Token (Compiler_Obj);
+                           exit when Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind =
+                                     End_Of_File_Token;
+                           if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind =
+                              Left_Curly_Brace_Token
+                           then
+                              Depth := Depth + 1;
+                           elsif Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind =
+                                 Right_Curly_Brace_Token
+                           then
+                              Depth := Depth - 1;
+                              exit when Depth = 0;
+                           end if;
+                        end loop;
+                        Lexer.Get_Next_Token (Compiler_Obj);  --  Consume closing '}'
+                     end;
+                  end if;
+                  return;
+               end if;
+
+               --  Create variable declaration node
+               Var_Node := new AST_Node_Type (AST_Variable_Declaration_Node);
+               Var_Node.Var_Is_Pointer := Is_Pointer;
+               Var_Node.Var_Is_Const := False;
+               Var_Node.Var_Is_Volatile := False;
+               Var_Node.Variable_Type := Var_Type_Id;
+               Var_Node.Variable_Name := Var_Name_Id;
+
+               --  Parse optional [[at(address)]] attribute
+               if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind =
+                  Left_Double_Square_Parenthesis_Token
+               then
+                  Parse_Variable_Attributes (Compiler_Obj, Var_Node.Variable_Attributes);
+               end if;
+
+               --  Parse optional initialization "= <expression>"
+               if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Assignment_Op_Token then
+                  Lexer.Get_Next_Token (Compiler_Obj);
+                  Parse_Expression (Compiler_Obj);
+                  Stack_Pop (Parser_Obj.Operand_Stack_Top, null, Var_Node.Var_Init_Value);
+               end if;
+
+               Expect_Token (Compiler_Obj, Semicolon_Token);
+
+               Declaration_Node := Var_Node;
+            end;
 
          when Void_Token =>
-            --  Void function declaration
-            --  TODO: Parse function declaration
-            Lexer.Get_Next_Token (Compiler_Obj);
-            Log_Message ("Parsing void function (not yet implemented)");
+            --  Void function declaration — skip until end of function body
+            --  TODO: Parse function declaration fully
+            Log_Message ("Skipping void function declaration (not yet implemented)");
+            --  Skip past parameter list, optional annotations, and function body
+            while Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /=
+                  Left_Curly_Brace_Token and then
+                  Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /=
+                  End_Of_File_Token
+            loop
+               Lexer.Get_Next_Token (Compiler_Obj);
+            end loop;
+            --  Skip the balanced { ... } function body
+            if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Left_Curly_Brace_Token then
+               declare
+                  Depth : Natural := 1;
+               begin
+                  loop
+                     Lexer.Get_Next_Token (Compiler_Obj);
+                     exit when Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind =
+                               End_Of_File_Token;
+                     if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind =
+                        Left_Curly_Brace_Token
+                     then
+                        Depth := Depth + 1;
+                     elsif Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind =
+                           Right_Curly_Brace_Token
+                     then
+                        Depth := Depth - 1;
+                        exit when Depth = 0;
+                     end if;
+                  end loop;
+                  Lexer.Get_Next_Token (Compiler_Obj);  --  Consume closing '}'
+               end;
+            end if;
 
          when others =>
             Log_Compiler_Error (Compiler_Obj, "Expected declaration");
@@ -736,11 +1227,6 @@ package body STC_Compiler.Parser is
 
    procedure Stack_Push (Stack_Top : in out AST_Node_Pointer_Type;
                          Node : AST_Node_Pointer_Type)
-      with Pre => Node /= null and then
-                  Node.Next_In_Stack = null and then
-                  Node /= Stack_Top,
-         Post => Stack_Top = Node and then
-                  Node.Next_In_Stack = Stack_Top'Old
    is
    begin
       Node.Next_In_Stack := Stack_Top;
@@ -750,10 +1236,8 @@ package body STC_Compiler.Parser is
    procedure Stack_Pop (Stack_Top : in out AST_Node_Pointer_Type;
                         Stack_Bottom : AST_Node_Pointer_Type;
                         Node : out AST_Node_Pointer_Type)
-      with Pre => Stack_Top /= Stack_Bottom,
-         Post => Node = Stack_Top'Old and then
-                  Node.Next_In_Stack = null
    is
+      pragma Unreferenced (Stack_Bottom);
    begin
       Node := Stack_Top;
       Stack_Top := Node.Next_In_Stack;

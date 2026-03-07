@@ -19,4 +19,13 @@ private
    procedure Parse_Expression (Compiler_Obj : in out Compiler_Type;
                                Operator_Stack_Bottom : AST_Node_Pointer_Type := null);
 
+   procedure Parse_Field_Attributes (Compiler_Obj : in out Compiler_Type;
+                                     Attr_List : out AST_Node_Pointer_Type);
+
+   procedure Parse_Type_Attributes (Compiler_Obj : in out Compiler_Type;
+                                    Attr_List : out AST_Node_Pointer_Type);
+
+   procedure Parse_Variable_Attributes (Compiler_Obj : in out Compiler_Type;
+                                        Attr_List : out AST_Node_Pointer_Type);
+
 end STC_Compiler.Parser;
