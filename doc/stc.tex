@@ -32,7 +32,7 @@
 \begin{titlepage}
    \centering
    \vspace*{2cm}
-   \includegraphics[width=0.45\textwidth]{logo/stc-forged-logo.png}\\[1.5cm]
+   \includegraphics[width=0.45\textwidth]{logo/stc-logo-v4.jpg}\\[1.5cm]
    {\Huge\bfseries The \emph{Strong-Typed C (stC)}\\[0.4cm]
     Programming Language\par}
    \vspace{1.5cm}
@@ -68,8 +68,9 @@ This document presents the \emph{stC} (\emph{``Strong-Typed C''} programming lan
 for safety-critical embedded software development.
 
 A proof-of-concept compiler for \emph{stC}, known as \verb'stcc', has been written
-in SPARK Ada. SPARK Ada \cite{SparkAda} is a high integrity subset of the Ada programming
-language. The code of \verb'stcc' is available in GitHub at \url{https://github.com/jgrivera67/stcc}.
+in Ada 2022. It acts as a transpiler that translates \emph{stC} source code into
+SPARK Ada 2022 \cite{SparkAda} source code that can be formally verified with GNATprove.
+The code of \verb'stcc' is available in GitHub at \url{https://github.com/jgrivera67/stcc}.
 
 \section{Language Overview}
 \begin{itemize}
@@ -85,22 +86,27 @@ types \verb'bool' and \verb'char'.
 \item There are no header files and no preprocessor.
 \item Declarations can be in any order. Symbols can be used before they are declared.
       In \emph{stC} there is no need for function prototypes or forward declarations.
-\item A translation unit has an explicit name specified at the beginning of the source file with the
-      \verb'unit' keyword.
-\item A translation unit (module) can import public declarations from other translation units, using their module names.
-\item A translation unit can have private declarations that are not visible to other translation units.
-\item A translation unit can have child translation units. A child unit is
-      named by using its parent unit's name followed by a dot as a prefix.
-\item  A child unit inherits all the public and private declarations of its ancestor units.
-       However, inherited private declarations cannot be used in the visible parts of the unit's public
-       declarations.
+\item A module has an explicit name specified at the beginning of the source file with the
+      \verb'module' keyword.
+\item A module can import public declarations from other modules, using their names.
+\item A module can have private declarations that are not visible to other modules.
+\item A module can have child modules. A child module is
+      named by using its parent module's name followed by a dot as a prefix.
+\item A child module inherits all the public and private declarations of its ancestor modules.
+      However, inherited private declarations cannot be used in the visible parts of the module's public
+      declarations.
+\item A child module can be declared \emph{private} by prefixing its \verb'module' declaration with the
+      \verb'private' keyword.  A private child module is only accessible to its parent module and to
+      sibling modules within the same module family; it cannot be imported by unrelated modules.
+      This corresponds to Ada's \emph{private child package} concept.
 \item The language is case-sensitive. All reserved words are lower case.
 \item The language is block-structured. Blocks are delimited by curly braces.
 \end{itemize}
 
 \section{stcc}
-\verb'stcc' does not generate machine code at the moment. It is only a ``transpiler'' which
-translates a \emph{stC} source file into equivalent SPARK Ada 2022 source code.
+\verb'stcc' is implemented in Ada 2022 and acts as a transpiler: it translates \emph{stC}
+source files into equivalent SPARK Ada 2022 source code. The generated code is intended to
+be fully compilable with GNAT and formally verifiable with GNATprove \cite{SparkAda}.
 
 \begin{itemize}
 \item For each \emph{stC} file an Ada package specification file (\verb'.ads') and an Ada package
@@ -135,7 +141,7 @@ const           continue        convention      decimal         default
 delta           digits          do              else            enum
 false           first           fixed           float           for
 foreign         global          goto            if              import
-in              inout           lambda          last            loop_invariant
+in              inout           last            loop_invariant
 loop_variant    modular         module          offset          out
 packed          post            pre             private         range
 reads           renames         return          size            sizeof
@@ -285,8 +291,8 @@ module stdint {
 
 %\begin{grammar}
 \begin{lstlisting}[numbersep=0pt,resetmargins=true]
-<translation-unit> ::=
-   "module" <module-name> "{"
+<module> ::=
+   ("private")? "module" <module-name> "{"
    ("import" <module-name> ("as" <module-identifier>)? ";")*
    <declaration>*
    ("private"
@@ -300,6 +306,7 @@ module stdint {
 <declaration> ::=
    <constant-declaration> |
    <type-declaration> |
+   <function-sig-type-declaration> |
    <subtype-declaration> |
    <variable-declaration> |
    <function-declaration> |
@@ -318,6 +325,12 @@ module stdint {
 
 <type-declaration> ::=
    "type" <type-declarator> <type-identifier> (<type-attributes>)? ";"
+
+<function-sig-type-declaration> ::=
+   "type" (<return-type-identifier> | "void") <type-identifier>
+   "(" (<param-declaration> ("," <param-declaration>)*)? ")" ";"
+
+<return-type-identifier> ::= <type-identifier>
 
 <subtype-declaration> ::=
    "subtype" <type-identifier> "range" <constant-integer-expression>
@@ -525,14 +538,9 @@ module stdint {
    <identifier> |
    <literal> |
    "(" <expression> ")" |
-   <type-cast-expression> |
-   <lambda-expression>
+   <type-cast-expression>
 
 <type-cast-expression> ::= <type-identifier> "(" <expression> ")"
-
-<lambda-expression> ::=
-   "lambda" "(" (<param-declaration> ("," <param-declaration>)*)? ")"
-   "=>" <expression>
 
 <boolean-expression> ::= <expression>
 
@@ -1376,20 +1384,40 @@ p_ptr->x = 10;      // Arrow operator
 p_ptr->y = 20;
 \end{lstlisting}
 
-\section{Lambda Expressions}
+\section{Function Signature Types}
+
+A \emph{function signature type} names the signature (parameters and return type) of a
+function. Variables and parameters of a function signature type hold a reference to a
+callable function; the compiler passes them by reference implicitly --- no explicit
+pointer syntax is required.
+
 \begin{lstlisting}
 type range -2147483648 .. 2147483647 int_t;
 
-// Lambda with no parameters
-auto get_zero = lambda() => 0;
+// Declare a function signature type with no parameters, returning void
+type void timer_cb_t();
 
-// Lambda with parameters
-auto add = lambda(in int_t a, in int_t b) => a + b;
+// Declare a function signature type with parameters, returning void
+type void binary_op_cb_t(in int_t a, in int_t b);
 
-int_t result = add(3, 4);  // result = 7
+// Declare a function signature type returning a value
+type int_t int_transform_t(in int_t x);
+
+// Use as a parameter -- the compiler passes the function reference implicitly
+void register_timer(in timer_cb_t callback, in uint32_t period_ms);
+
+// Assign a named function to a function-signature-type variable
+void my_handler() { }
+timer_cb_t cb = my_handler;
+
+// Call through the variable like a normal function
+cb();
+
+// Pass directly as an argument
+register_timer(my_handler, 100);
 \end{lstlisting}
 
-\section{Compilation Unit Example}
+\section{Module Example}
 \begin{lstlisting}
 module geometry {
 
@@ -1417,6 +1445,10 @@ module geometry {
 \end{lstlisting}
 
 \section{Child Modules}
+
+A \emph{public} child module is visible to any module that imports it.
+It inherits the public and private declarations of all its ancestor modules.
+
 \begin{lstlisting}
 // File: geometry.circle.stc
 module geometry.circle {
@@ -1433,6 +1465,57 @@ module geometry.circle {
   bool point_in_circle(in point_t p, in circle_t c) {
     return distance_squared(p, c.center) <= square(c.radius);
   }
+
+}
+\end{lstlisting}
+
+\subsection{Private Child Modules}
+
+A \emph{private} child module is prefixed with the \verb'private' keyword.
+It can only be imported by its parent module and by sibling modules within
+the same module family.  Unrelated modules cannot import it.
+This corresponds directly to Ada's \emph{private child package}.
+
+\begin{lstlisting}
+// File: geometry.internal.stc
+// Private child -- only geometry and geometry.* siblings can import this
+private module geometry.internal {
+
+  // Inherits point_t and coordinate_t from parent module geometry
+
+  // Internal helper not exposed to users of the geometry module family
+  coordinate_t clamp(in coordinate_t v,
+                     in coordinate_t lo,
+                     in coordinate_t hi) {
+    if (v < lo) return lo;
+    if (v > hi) return hi;
+    return v;
+  }
+
+}
+\end{lstlisting}
+
+\begin{lstlisting}
+// File: geometry.circle.stc  (sibling -- allowed to import the private child)
+module geometry.circle {
+
+  import geometry.internal;   // OK: sibling within geometry family
+
+  type range 0 .. 1000 radius_t;
+
+  coordinate_t clamped_x(in point_t p, in coordinate_t lo, in coordinate_t hi) {
+    return geometry.internal.clamp(p.x, lo, hi);
+  }
+
+}
+\end{lstlisting}
+
+\begin{lstlisting}
+// File: app.stc  (unrelated module -- NOT allowed to import the private child)
+module app {
+
+  import geometry.circle;    // OK: public child
+  // import geometry.internal;  // ERROR: private child, not accessible here
 
 }
 \end{lstlisting}
