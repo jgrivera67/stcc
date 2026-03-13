@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400">
+
+  <!-- Background C letter -->
+  <g transform="translate(190, 200)">
+    <path d="M 55,-150
+             A 170,170 0 1,0 55,150
+             L 55,110
+             A 130,130 0 1,1 55,-110
+             Z"
+          fill="#a8b8c8" stroke="#6a7a8a" stroke-width="3"/>
+    <path d="M 55,-142
+             A 162,162 0 1,0 55,142
+             L 55,114
+             A 134,134 0 1,1 55,-114
+             Z"
+          fill="none" stroke="#c0ccd6" stroke-width="1" opacity="0.5"/>
+  </g>
+
+  <!-- Stylized hummingbird - side profile, bold shapes -->
+  <g transform="translate(215, 165)">
+
+    <!-- Wing (single, side view) - large sweeping arc -->
+    <path d="M -15, 10
+             C -25,-5 -50,-40 -80,-70
+             C -95,-82 -110,-88 -120,-85
+             C -115,-75 -105,-62 -90,-50
+             C -100,-55 -112,-65 -118,-75
+             C -112,-62 -100,-48 -82,-36
+             C -92,-42 -105,-55 -112,-65
+             C -105,-52 -92,-38 -75,-28
+             C -55,-15 -30,-5 -15,5
+             Z"
+          fill="#1a1a1a" stroke="#000" stroke-width="1.5"
+          stroke-linejoin="round"/>
+
+    <!-- Body - smooth teardrop/torpedo shape -->
+    <path d="M 15,-15
+             C 20,-10 22,0 22,15
+             C 22,35 18,60 12,80
+             C 8,92 3,98 0,100
+             C -3,98 -8,92 -12,80
+             C -18,60 -20,35 -18,15
+             C -18,0 -15,-10 -10,-15
+             Z"
+          fill="#1a1a1a" stroke="#000" stroke-width="1"/>
+
+    <!-- Breast - lighter area -->
+    <path d="M 10,5
+             C 12,15 12,30 8,55
+             C 6,65 3,72 0,75
+             C -3,72 -6,65 -8,55
+             C -10,30 -8,15 -5,5
+             Z"
+          fill="#282828"/>
+
+    <!-- Blue diamond on breast -->
+    <polygon points="0,25 12,45 0,65 -12,45"
+             fill="#2255bb" stroke="#102a66" stroke-width="1.2"/>
+    <polygon points="0,30 8,45 0,60 -8,45"
+             fill="#3872dd" opacity="0.3"/>
+
+    <!-- Head - round -->
+    <circle cx="2" cy="-25" r="18"
+            fill="#1a1a1a" stroke="#000" stroke-width="1"/>
+
+    <!-- Eye -->
+    <circle cx="10" cy="-28" r="5.5" fill="white"/>
+    <circle cx="11.5" cy="-29.5" r="3.5" fill="#111"/>
+    <circle cx="13" cy="-31" r="1.1" fill="white"/>
+
+    <!-- Beak - long, thin, elegant curve -->
+    <path d="M 17,-30
+             C 28,-34 55,-44 85,-55
+             C 55,-46 28,-38 17,-36
+             Z"
+          fill="#3a3a3a" stroke="#1a1a1a" stroke-width="0.8"/>
+
+    <!-- Tail - two broad elegant feathers -->
+    <path d="M -8,96
+             C -18,108 -35,125 -55,148
+             C -50,135 -38,118 -25,105
+             C -18,99 -12,97 -6,98
+             Z"
+          fill="#1a1a1a" stroke="#000" stroke-width="0.8"/>
+    <path d="M 2,98
+             C -5,112 -18,130 -35,152
+             C -28,138 -15,120 -5,108
+             C 0,102 3,100 5,100
+             Z"
+          fill="#222" stroke="#000" stroke-width="0.8"/>
+  </g>
+</svg>
