@@ -1,0 +1,28 @@
+//
+//  Simple test for variable declarations with [[at(address)]]
+//
+
+module test_simple_variables {
+
+  // Basic type
+  type modular 256 uint8_t;
+
+  // Test 1: Simple variable declaration
+  uint8_t my_var;
+
+  // Test 2: Volatile variable
+  volatile uint8_t volatile_var;
+
+  // Test 3: Variable with [[at(address)]]
+  uint8_t mapped_var [[at(0x40000000)]];
+
+  // Test 4: Volatile variable with [[at(address)]] - POINTERLESS MMIO
+  volatile uint8_t mmio_reg [[at(0x40000000)]];
+
+  // Test 5: Pointer variable
+  uint8_t* my_ptr;
+
+  // Test 6: Volatile pointer with [[at(address)]]
+  volatile uint8_t* ptr_reg [[at(0x40001000)]];
+
+}

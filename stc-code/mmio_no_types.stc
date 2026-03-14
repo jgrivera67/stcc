@@ -1,0 +1,16 @@
+//
+//  MMIO with no preliminary type declarations
+//
+
+module mmio_no_types {
+
+  // GPIO register with bit fields (using built-in bool type)
+  type struct {
+    bool enable [[offset(0) bit(0)]];
+    bool output_enable [[offset(0) bit(1)]];
+  } gpio_control_t;
+
+  // Pointerless MMIO variable
+  volatile gpio_control_t GPIO_REG [[at(0x40000000)]];
+
+}

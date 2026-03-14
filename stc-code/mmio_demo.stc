@@ -1,0 +1,44 @@
+//
+//  MMIO Demo: Bit Fields + Pointerless Variable Access
+//
+//  This demonstrates the complete MMIO register feature:
+//  1. Bit field syntax for precise hardware register layout
+//  2. Pointerless variable declarations using [[at(address)]]
+//  3. Ada/SPARK-style memory-mapped I/O
+//
+
+module mmio_demo {
+
+  // Basic types
+  type modular 256 uint8_t;
+  type range 0 .. 7 uint3_t;
+
+  //
+  // GPIO Control Register with bit fields
+  //
+  type struct {
+    bool enable [[offset(0) bit(0)]];
+    bool output_enable [[offset(0) bit(1)]];
+    uint3_t drive_strength [[offset(0) bits(2 .. 4)]];
+    uint8_t pin_value [[offset(1) bits(0 .. 7)]];
+  } gpio_control_t;
+
+  //
+  // POINTERLESS MMIO: Declare hardware registers at fixed addresses
+  // No pointers needed - just like Ada/SPARK!
+  //
+  volatile gpio_control_t GPIO_PORT_A [[at(0x40000000)]];
+  volatile gpio_control_t GPIO_PORT_B [[at(0x40000100)]];
+
+  //
+  // Function using pointerless MMIO access
+  //
+  void init_gpio() {
+    // No pointer dereference - direct access!
+    GPIO_PORT_A.enable = true;
+    GPIO_PORT_A.output_enable = true;
+    GPIO_PORT_A.drive_strength = 7;
+    GPIO_PORT_A.pin_value = 0xFF;
+  }
+
+}

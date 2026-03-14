@@ -34,7 +34,7 @@ void clear_data() {
 }
 
 // Example 3: Function that uses array attributes
-uint32_t sum_array(byte_t[] arr)
+uint32_t sum_array(byte_t arr[])
   [[pre(arr'first <= arr'last)]]
   [[post(result >= 0)]]
 {
@@ -49,7 +49,7 @@ uint32_t sum_array(byte_t[] arr)
 }
 
 // Example 4: Computing array length using attributes
-index_t get_array_length(byte_t[] arr) {
+index_t get_array_length(byte_t arr[]) {
   // Array length can be computed from 'first and 'last
   return (arr'last - arr'first) + 1;
 }

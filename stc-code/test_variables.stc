@@ -1,0 +1,48 @@
+//
+//  Test file for variable declarations with [[at(address)]] in stC
+//
+//  This file tests:
+//  - Variable declarations without qualifiers
+//  - Variable declarations with volatile qualifier
+//  - Variable declarations with [[at(address)]] attribute
+//  - Pointerless MMIO register access
+//
+
+module test_variables {
+
+  // Basic types
+  type modular 256 uint8_t;
+  type range 0 .. 7 uint3_t;
+
+  // GPIO register type with bit fields
+  type struct {
+    bool enable [[offset(0) bit(0)]];
+    uint3_t mode [[offset(0) bits(1 .. 3)]];
+    uint8_t value [[offset(1) bits(0 .. 7)]];
+  } gpio_control_t;
+
+  // Test 1: Simple variable declaration (no qualifier, no attribute)
+  gpio_control_t my_gpio;
+
+  // Test 2: Volatile variable declaration (no attribute)
+  volatile gpio_control_t volatile_gpio;
+
+  // Test 3: Variable with [[at(address)]] attribute (no volatile)
+  gpio_control_t mapped_gpio [[at(0x40000000)]];
+
+  // Test 4: POINTERLESS MMIO - volatile variable with [[at(address)]]
+  volatile gpio_control_t gpio_reg [[at(0x40000000)]];
+
+  // Test 5: Pointer variable
+  gpio_control_t* gpio_ptr;
+
+  // Test 6: Volatile pointer variable with [[at(address)]]
+  volatile gpio_control_t* gpio_ptr_reg [[at(0x40001000)]];
+
+  // Test 7: Variable with initialization
+  uint8_t counter = 0;
+
+  // Test 8: Volatile variable with initialization
+  volatile uint8_t status = 0xFF;
+
+}

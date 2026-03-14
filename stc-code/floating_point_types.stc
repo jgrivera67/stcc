@@ -19,7 +19,7 @@ module floating_point_types {
   // Physical measurements
   type float digits 8 range 0.0 .. 10000.0 pressure_t;     // Pascals
   type float digits 8 range 0.0 .. 1000.0 velocity_t;      // m/s
-  type float digits 10 range 0.0 .. 1.0e6 distance_t;      // meters
+  type float digits 10 range 0.0 .. 1000000.0 distance_t;   // meters
 
   // Scientific computation example
   float64_t calculate_velocity(distance_t d, float64_t t)

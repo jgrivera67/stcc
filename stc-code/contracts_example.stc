@@ -11,7 +11,7 @@ module contracts_example {
 
   // Array type for demonstrating 'Range, 'First, 'Last
   type range 0 .. 99 index_t;
-  type modular 100 array_100_t[100];
+  type modular 100 array_100_t;
 
   // Function with global contract - reads one variable, writes another
   uint32_t increment_counter()

@@ -1,0 +1,20 @@
+//
+//  Minimal MMIO Demo: Bit Fields + Pointerless Variables
+//
+
+module mmio_minimal {
+
+  // Single type declaration
+  type modular 256 uint8_t;
+
+  // GPIO register with bit fields
+  type struct {
+    bool enable [[offset(0) bit(0)]];
+    bool output_enable [[offset(0) bit(1)]];
+    uint8_t pin_value [[offset(1) bits(0 .. 7)]];
+  } gpio_control_t;
+
+  // Pointerless MMIO variable
+  volatile gpio_control_t GPIO_REG [[at(0x40000000)]];
+
+}

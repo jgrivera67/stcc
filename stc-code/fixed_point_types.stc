@@ -26,7 +26,9 @@ module fixed_point_types {
   voltage_t supply_voltage = 3.300;    // Exactly 3.300V
   voltage_t reference_voltage = 1.250; // Exactly 1.250V
 
-  voltage_t read_adc_voltage(type range 0 .. 4095 adc_value)
+  type range 0 .. 4095 adc_value_t;
+
+  voltage_t read_adc_voltage(adc_value_t adc_value)
     [[pre(adc_value >= 0 && adc_value <= 4095)]]
     [[post(result >= 0.0 && result <= 5.0)]]
   {
@@ -57,10 +59,10 @@ module fixed_point_types {
   }
 
   // Complex financial calculation
+  type range 1 .. 360 month_t;
   type struct {
     money_t principal;
     interest_t annual_rate;  // As decimal (e.g., 0.0325 for 3.25%)
-    type range 1 .. 360 month_t;
     month_t months;
   } loan_t;
 
@@ -85,8 +87,8 @@ module fixed_point_types {
     money_t credits;
   } account_t;
 
-  account_t checking_account = { debits = 0.0, credits = 0.0 };
-  account_t savings_account = { debits = 0.0, credits = 0.0 };
+  account_t checking_account;
+  account_t savings_account;
 
   void post_debit(inout account_t account, money_t amount)
     [[pre(amount >= 0.0)]]
@@ -144,9 +146,9 @@ module fixed_point_types {
   }
 
   // Inventory pricing system
+  type range 0 .. 100000 quantity_t;
   type struct {
     price_t unit_price;
-    type range 0 .. 100000 quantity_t;
     quantity_t quantity;
   } inventory_item_t;
 

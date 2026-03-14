@@ -1,0 +1,236 @@
+//
+//  Memory-Mapped I/O Register Examples for stC
+//
+//  This file demonstrates:
+//  - Bit field syntax with [[offset(...)]] and [[bit(...)]] / [[bits(...)]]
+//  - MMIO register layout with precise bit-level control
+//  - Type-level attributes:, [[volatile]], [[at(address)]]
+//  - Practical embedded systems register definitions
+//
+//  Key concepts:
+//  - Struct WITH offset/bits: uses explicit Ada representation (programmer controls layout)
+//  - Struct WITHOUT offset/bits: uses C layout (compiler packing rules)
+//  - offset is REQUIRED when using bit/bits (avoids C bit field ambiguity)
+//  - All-or-nothing: either ALL fields have offset/bits or NONE do
+//
+
+module mmio_registers {
+
+  // Basic types for register fields
+  type modular 256 uint8_t;
+  type range 0 .. 7 uint3_t;
+  type range 0 .. 15 uint4_t;
+
+  //
+  // Example 1: GPIO Control Register (8-bit)
+  // Single byte register with individual bit fields
+  //
+  type struct {
+    bool enable [[offset(0) bit(0)]];           // Bit 0: Port enable
+    bool output_enable [[offset(0) bit(1)]];    // Bit 1: Output enable
+    bool pull_up [[offset(0) bit(2)]];          // Bit 2: Pull-up resistor
+    bool pull_down [[offset(0) bit(3)]];        // Bit 3: Pull-down resistor
+    uint4_t drive_strength [[offset(0) bits(4 .. 7)]]; // Bits 4-7: Drive strength (0-15)
+  } gpio_control_8bit_t;
+
+  //
+  // Example 2: GPIO Control Register (32-bit)
+  // Multi-byte register demonstrating byte offset specification
+  //
+  type struct {
+    bool port_enable [[offset(0) bit(0)]];      // Byte 0, bit 0
+    bool output_enable [[offset(0) bit(1)]];    // Byte 0, bit 1
+    bool pull_up [[offset(0) bit(2)]];          // Byte 0, bit 2
+    bool pull_down [[offset(0) bit(3)]];        // Byte 0, bit 3
+    uint4_t drive_strength [[offset(0) bits(4 .. 7)]]; // Byte 0, bits 4-7
+    uint8_t reserved1 [[offset(1) bits(0 .. 7)]]; // Byte 1, all bits (reserved)
+    uint8_t pin_value [[offset(2) bits(0 .. 7)]]; // Byte 2: Pin input/output value
+    uint8_t interrupt_status [[offset(3) bits(0 .. 7)]]; // Byte 3: Interrupt flags
+  } gpio_control_32bit_t;
+
+  //
+  // Example 3: Timer Control Register
+  // Demonstrates various field sizes and purposes
+  //
+  type struct {
+    bool enable [[offset(0) bit(0)]];           // Bit 0: Timer enable
+    bool interrupt_enable [[offset(0) bit(1)]]; // Bit 1: Interrupt enable
+    bool auto_reload [[offset(0) bit(2)]];      // Bit 2: Auto-reload mode
+    uint3_t prescaler [[offset(0) bits(3 .. 5)]]; // Bits 3-5: Clock prescaler (0-7)
+    uint8_t reserved1 [[offset(0) bits(6 .. 7)]]; // Bits 6-7: Reserved
+    uint8_t compare_value [[offset(1) bits(0 .. 7)]]; // Byte 1: Compare value
+    uint8_t counter_low [[offset(2) bits(0 .. 7)]];  // Byte 2: Counter low byte
+    uint8_t counter_high [[offset(3) bits(0 .. 7)]]; // Byte 3: Counter high byte
+  } timer_control_t;
+
+  //
+  // Example 4: UART Status Register
+  // Common peripheral status register layout
+  //
+  type struct {
+    bool rx_ready [[offset(0) bit(0)]];         // Bit 0: Receive buffer ready
+    bool tx_empty [[offset(0) bit(1)]];         // Bit 1: Transmit buffer empty
+    bool parity_error [[offset(0) bit(2)]];     // Bit 2: Parity error flag
+    bool frame_error [[offset(0) bit(3)]];      // Bit 3: Frame error flag
+    bool overrun_error [[offset(0) bit(4)]];    // Bit 4: Overrun error flag
+    uint3_t reserved [[offset(0) bits(5 .. 7)]];  // Bits 5-7: Reserved
+  } uart_status_t;
+
+  //
+  // Example 5: UART Configuration Register
+  // Configuration register with multiple field types
+  //
+  type struct {
+    uint8_t baud_divisor [[offset(0) bits(0 .. 7)]]; // Byte 0: Baud rate divisor
+    uint8_t data_bits [[offset(1) bits(0 .. 1)]];    // Byte 1, bits 0-1: Data bits (5-8)
+    bool parity_enable [[offset(1) bit(2)]];       // Byte 1, bit 2: Parity enable
+    bool parity_odd [[offset(1) bit(3)]];          // Byte 1, bit 3: Odd parity (0=even, 1=odd)
+    uint8_t stop_bits [[offset(1) bits(4 .. 5)]];    // Byte 1, bits 4-5: Stop bits (1-2)
+    uint8_t reserved [[offset(1) bits(6 .. 7)]];     // Byte 1, bits 6-7: Reserved
+  } uart_config_t;
+
+  //
+  // Example 6: SPI Control Register
+  // SPI peripheral control register
+  //
+  type struct {
+    bool enable [[offset(0) bit(0)]];           // Bit 0: SPI enable
+    bool master_mode [[offset(0) bit(1)]];      // Bit 1: Master mode select
+    bool clock_polarity [[offset(0) bit(2)]];   // Bit 2: Clock polarity
+    bool clock_phase [[offset(0) bit(3)]];      // Bit 3: Clock phase
+    uint3_t clock_divider [[offset(0) bits(4 .. 6)]]; // Bits 4-6: Clock divider
+    bool lsb_first [[offset(0) bit(7)]];        // Bit 7: LSB first transmission
+  } spi_control_t;
+
+  //
+  // Example 7: Interrupt Control Register
+  // Multi-byte interrupt controller
+  //
+  type struct {
+    uint8_t enable_flags [[offset(0) bits(0 .. 7)]];   // Byte 0: Interrupt enable bits
+    uint8_t pending_flags [[offset(1) bits(0 .. 7)]];  // Byte 1: Pending interrupt bits
+    uint8_t priority_0 [[offset(2) bits(0 .. 3)]];     // Byte 2, bits 0-3: IRQ 0 priority
+    uint8_t priority_1 [[offset(2) bits(4 .. 7)]];     // Byte 2, bits 4-7: IRQ 1 priority
+    uint8_t priority_2 [[offset(3) bits(0 .. 3)]];     // Byte 3, bits 0-3: IRQ 2 priority
+    uint8_t priority_3 [[offset(3) bits(4 .. 7)]];     // Byte 3, bits 4-7: IRQ 3 priority
+  } interrupt_control_t;
+
+  //
+  // Example 8: ADC Control and Status Register
+  // Analog-to-Digital Converter register
+  //
+  type struct {
+    bool start_conversion [[offset(0) bit(0)]];     // Bit 0: Start conversion
+    bool continuous_mode [[offset(0) bit(1)]];      // Bit 1: Continuous conversion mode
+    bool conversion_complete [[offset(0) bit(2)]];  // Bit 2: Conversion complete flag
+    uint4_t channel_select [[offset(0) bits(3 .. 6)]]; // Bits 3-6: Channel select (0-15)
+    bool interrupt_enable [[offset(0) bit(7)]];     // Bit 7: Interrupt enable
+    uint8_t reserved [[offset(1) bits(0 .. 7)]];      // Byte 1: Reserved
+    uint8_t conversion_result [[offset(2) bits(0 .. 7)]]; // Byte 2: 8-bit conversion result
+    uint8_t reserved2 [[offset(3) bits(0 .. 7)]];     // Byte 3: Reserved
+  } adc_control_t;
+
+  //
+  // Example 9: Regular Struct (No Bit Fields)
+  // Uses normal C layout - no explicit offset/bits attributes
+  //
+  type struct {
+    uint32_t timestamp;      // Normal C layout
+    uint16_t event_id;       // Follows timestamp with standard alignment
+    uint8_t priority;        // Standard C struct semantics
+    bool is_active;          // Compiler decides layout
+  } event_record_t;          // No - standard C padding rules apply
+
+  //
+  // Example 10: PWM Timer Register
+  // Pulse Width Modulation timer configuration
+  //
+  type struct {
+    bool enable [[offset(0) bit(0)]];           // Bit 0: PWM enable
+    bool polarity [[offset(0) bit(1)]];         // Bit 1: Output polarity
+    uint3_t mode [[offset(0) bits(2 .. 4)]];      // Bits 2-4: PWM mode
+    uint3_t reserved1 [[offset(0) bits(5 .. 7)]]; // Bits 5-7: Reserved
+    uint8_t duty_cycle [[offset(1) bits(0 .. 7)]]; // Byte 1: Duty cycle (0-255)
+    uint8_t period_low [[offset(2) bits(0 .. 7)]];   // Byte 2: Period low byte
+    uint8_t period_high [[offset(3) bits(0 .. 7)]];  // Byte 3: Period high byte
+  } pwm_control_t;
+
+  //
+  // POINTERLESS MMIO: Memory-Mapped Register Instances
+  // Variables can be declared at fixed addresses using [[at(address)]]
+  // This enables Ada/SPARK-style pointerless hardware access
+  //
+
+  // Example: GPIO register mapped to address 0x40000000 (no pointers!)
+  volatile gpio_control_32bit_t GPIO_PORT_A [[at(0x40000000)]];
+
+  // Example: Timer control register at 0x40001000
+  volatile timer_control_t TIMER0 [[at(0x40001000)]];
+
+  // Example: PWM control register at 0x40002000
+  volatile pwm_control_t PWM_CHANNEL_0 [[at(0x40002000)]];
+
+  //
+
+  //
+  // Function Examples (would use these registers in actual code)
+  //
+
+  // Initialize GPIO port for output
+  void gpio_init_output(gpio_control_32bit_t* gpio, uint8_t strength)
+    [[pre(strength <= 15)]]
+    [[global(writes => (gpio))]]
+  {
+    gpio->port_enable = true;
+    gpio->output_enable = true;
+    gpio->drive_strength = strength;
+    gpio->pull_up = false;
+    gpio->pull_down = false;
+  }
+
+  // Start timer with interrupt
+  void timer_start(timer_control_t* timer, uint8_t prescale, uint8_t compare)
+    [[pre(prescale <= 7)]]
+    [[global(writes => (timer))]]
+  {
+    timer->enable = false;
+    timer->prescaler = prescale;
+    timer->compare_value = compare;
+    timer->auto_reload = true;
+    timer->interrupt_enable = true;
+    timer->enable = true;
+  }
+
+  // Configure UART
+  void uart_configure(uart_config_t* config, uint8_t baud_div, uint8_t data_bits_val)
+    [[pre(data_bits_val >= 5 && data_bits_val <= 8)]]
+    [[global(writes => (config))]]
+  {
+    config->baud_divisor = baud_div;
+    config->data_bits = data_bits_val - 5;  // 0-3 maps to 5-8 data bits
+    config->parity_enable = true;
+    config->parity_odd = false;  // Even parity
+    config->stop_bits = 1;       // 1 stop bit
+  }
+
+  // Check UART errors
+  bool uart_has_errors(uart_status_t* status)
+    [[global(reads => (status))]]
+  {
+    return status->parity_error || status->frame_error || status->overrun_error;
+  }
+
+  // Set PWM duty cycle
+  void pwm_set_duty_cycle(pwm_control_t* pwm, uint8_t duty, uint16_t period_val)
+    [[pre(duty <= 100)]]
+    [[global(writes => (pwm))]]
+  {
+    pwm->enable = false;
+    pwm->duty_cycle = (duty * 255) / 100;  // Convert percentage to 0-255
+    pwm->period = period_val;
+    pwm->polarity = false;
+    pwm->mode = 1;  // PWM mode 1
+    pwm->enable = true;
+  }
+
+}
