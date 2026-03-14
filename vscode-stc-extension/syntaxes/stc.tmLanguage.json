@@ -4,6 +4,8 @@
   "scopeName": "source.stc",
   "patterns": [
     { "include": "#comments" },
+    { "include": "#annotations" },
+    { "include": "#tick-attributes" },
     { "include": "#keywords" },
     { "include": "#strings" },
     { "include": "#characters" },
@@ -27,11 +29,49 @@
         }
       ]
     },
+
+    "annotations": {
+      "comment": "Double-bracket annotations: [[pre(...)]], [[at(...)]], [[offset(...) bit(...)]], [[no_return]], etc.",
+      "patterns": [
+        {
+          "name": "meta.annotation.stc",
+          "begin": "\\[\\[",
+          "end": "\\]\\]",
+          "beginCaptures": {
+            "0": { "name": "punctuation.definition.annotation.stc" }
+          },
+          "endCaptures": {
+            "0": { "name": "punctuation.definition.annotation.stc" }
+          },
+          "patterns": [
+            { "include": "#comments" },
+            { "include": "#keywords" },
+            { "include": "#strings" },
+            { "include": "#numbers" },
+            { "include": "#types" },
+            { "include": "#constants" },
+            { "include": "#operators" },
+            { "include": "#functions" }
+          ]
+        }
+      ]
+    },
+
+    "tick-attributes": {
+      "comment": "Ada-style tick operator for type/array attributes: type'first, type'last, type'length, type'range, type'size. Must be matched BEFORE character literals.",
+      "patterns": [
+        {
+          "name": "keyword.attribute.tick.stc",
+          "match": "(?<=[a-zA-Z0-9_])'(?:first|last|length|range|size)\\b"
+        }
+      ]
+    },
+
     "keywords": {
       "patterns": [
         {
           "name": "keyword.control.stc",
-          "match": "\\b(if|else|while|for|do|switch|case|default|break|continue|return|goto)\\b"
+          "match": "\\b(if|else|while|for|do|loop|switch|case|default|break|continue|return|goto)\\b"
         },
         {
           "name": "keyword.other.stc",
@@ -50,19 +90,66 @@
           "match": "\\b(pre|post|global|reads|writes|loop_invariant|loop_variant|type_invariant|assert)\\b"
         },
         {
-          "name": "keyword.attribute.stc",
-          "match": "\\b(first|last|size)\\b"
-        },
-        {
           "name": "keyword.attribute.hardware.stc",
-          "match": "\\b(offset|bit|bits|at)\\b"
+          "match": "\\b(offset|bit|bits|at|no_return)\\b"
         },
         {
           "name": "keyword.other.compile-time.stc",
-          "match": "\\b(compile_if|convention|renames|as|lambda)\\b"
+          "match": "\\b(compile_if|convention|renames|as)\\b"
         }
       ]
     },
+
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.stc",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.stc",
+              "match": "\\\\[ntrx0\\\\\"']"
+            }
+          ]
+        }
+      ]
+    },
+
+    "characters": {
+      "comment": "Character literals: 'a', '\\n', '\\t', '\\r', '\\\\', '\\'', '\\0'. Uses a match (not begin/end) so that the tick attribute operator type'first is not mistaken for a string start.",
+      "patterns": [
+        {
+          "name": "string.quoted.single.stc",
+          "match": "'(?:\\\\[ntrx0\\\\']|[^'\\\\])'"
+        }
+      ]
+    },
+
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.hex.stc",
+          "comment": "Hex literals with underscore digit separators: 0xfe20_1000, 0x1_0000_0000",
+          "match": "\\b0x[0-9a-fA-F][0-9a-fA-F_]*\\b"
+        },
+        {
+          "name": "constant.numeric.binary.stc",
+          "comment": "Binary literals with underscore digit separators: 0b0001, 0b10_0000",
+          "match": "\\b0b[01][01_]*\\b"
+        },
+        {
+          "name": "constant.numeric.float.stc",
+          "match": "\\b\\d+\\.\\d+(?:[eE][+-]?\\d+)?\\b"
+        },
+        {
+          "name": "constant.numeric.decimal.stc",
+          "comment": "Decimal literals with underscore digit separators: 115_200, 48_000_000",
+          "match": "\\b\\d[\\d_]*\\b"
+        }
+      ]
+    },
+
     "types": {
       "patterns": [
         {
@@ -70,11 +157,18 @@
           "match": "\\b(void|bool|char)\\b"
         },
         {
+          "name": "storage.type.primitive.stc",
+          "comment": "Standard integer types",
+          "match": "\\b(uint8_t|uint16_t|uint32_t|uint64_t|int8_t|int16_t|int32_t|int64_t)\\b"
+        },
+        {
           "name": "storage.type.stc",
+          "comment": "User-defined types: any identifier ending in _t",
           "match": "\\b([a-z_][a-z0-9_]*_t)\\b"
         }
       ]
     },
+
     "constants": {
       "patterns": [
         {
@@ -87,58 +181,18 @@
         }
       ]
     },
-    "strings": {
-      "patterns": [
-        {
-          "name": "string.quoted.double.stc",
-          "begin": "\"",
-          "end": "\"",
-          "patterns": [
-            {
-              "name": "constant.character.escape.stc",
-              "match": "\\\\(n|t|r|\\\\|\"|'|0)"
-            }
-          ]
-        }
-      ]
-    },
-    "characters": {
-      "patterns": [
-        {
-          "name": "string.quoted.single.stc",
-          "begin": "'",
-          "end": "'",
-          "patterns": [
-            {
-              "name": "constant.character.escape.stc",
-              "match": "\\\\(n|t|r|\\\\|\"|'|0)"
-            }
-          ]
-        }
-      ]
-    },
-    "numbers": {
-      "patterns": [
-        {
-          "name": "constant.numeric.hex.stc",
-          "match": "\\b0x[0-9a-fA-F][0-9a-fA-F_']*\\b"
-        },
-        {
-          "name": "constant.numeric.binary.stc",
-          "match": "\\b0b[01][01_']*\\b"
-        },
-        {
-          "name": "constant.numeric.float.stc",
-          "match": "\\b\\d+\\.\\d+([eE][+-]?\\d+)?\\b"
-        },
-        {
-          "name": "constant.numeric.decimal.stc",
-          "match": "\\b\\d[\\d_']*\\b"
-        }
-      ]
-    },
+
     "operators": {
+      "comment": "Ordered longest-to-shortest to prevent shorter operators from matching first (e.g. ** before *, << before <, == before =, && before &).",
       "patterns": [
+        {
+          "name": "keyword.operator.power.stc",
+          "match": "\\*\\*"
+        },
+        {
+          "name": "keyword.operator.shift.stc",
+          "match": "<<=|>>=|<<|>>"
+        },
         {
           "name": "keyword.operator.range.stc",
           "match": "\\.\\."
@@ -148,31 +202,40 @@
           "match": "->"
         },
         {
+          "name": "keyword.operator.logical.stc",
+          "match": "&&|\\|\\|"
+        },
+        {
           "name": "keyword.operator.comparison.stc",
-          "match": "(==|!=|<=|>=|<|>)"
+          "match": "==|!=|<=|>="
+        },
+        {
+          "name": "keyword.operator.assignment.compound.stc",
+          "match": "\\+=|-=|\\*=|/=|%=|&=|\\|=|\\^="
+        },
+        {
+          "name": "keyword.operator.comparison.stc",
+          "match": "<|>"
         },
         {
           "name": "keyword.operator.logical.stc",
-          "match": "(&&|\\|\\||!)"
+          "match": "!"
         },
         {
           "name": "keyword.operator.bitwise.stc",
-          "match": "(&|\\||\\^|~|<<|>>)"
+          "match": "&|\\||\\^|~"
         },
         {
           "name": "keyword.operator.arithmetic.stc",
-          "match": "(\\+|-|\\*|/|%|\\*\\*)"
+          "match": "\\+|-|\\*|/|%"
         },
         {
           "name": "keyword.operator.assignment.stc",
-          "match": "(=|\\+=|-=|\\*=|/=|%=|&=|\\|=|\\^=|<<=|>>=)"
-        },
-        {
-          "name": "keyword.operator.ternary.stc",
-          "match": "(\\?|:)"
+          "match": "="
         }
       ]
     },
+
     "functions": {
       "patterns": [
         {

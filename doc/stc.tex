@@ -32,7 +32,7 @@
 \begin{titlepage}
    \centering
    \vspace*{2cm}
-   \includegraphics[width=0.45\textwidth]{logo/stc-logo-v4.jpg}\\[1.5cm]
+   \includegraphics[width=0.45\textwidth]{logo/stc-logo-v7.jpg}\\[1.5cm]
    {\Huge\bfseries The \emph{Strong-Typed C (stC)}\\[0.4cm]
     Programming Language\par}
    \vspace{1.5cm}
@@ -532,7 +532,7 @@ module stdint {
        ("->" <struct-field-identifier>) |
        ("'" <identifier-attribute>))*
 
-<identifier-attribute> ::= "first" | "last" | "range" | "size"
+<identifier-attribute> ::= "first" | "last" | "length" | "range" | "size"
 
 <primary-expression> ::=
    <identifier> |
@@ -583,15 +583,15 @@ module stdint {
 <void-function-identifier> ::= "<identifier>"
 
 <variable-attributes> ::=
-   ("@" <variable-attribute-name>)+
+   ("[[" <variable-attribute> "]]")+
 
-<variable-attribute-name> ::= "at" "(" <constant-expression> ")" | "volatile"
+<variable-attribute> ::= "at" "(" <constant-expression> ")"
 
 <function-attributes> ::=
    <function-attribute>+
 
 <function-attribute> ::=
-   "[[" <function-contract> "]]"
+   "[[" (<function-contract> | "no_return") "]]"
 
 <function-contract> ::=
    <precondition> | <postcondition> | <global-clause>
@@ -620,10 +620,10 @@ module stdint {
 <loop-variant> ::= "loop_variant" "(" <expression> ")"
 
 <type-attributes> ::=
-   ("@" <type-attribute-name>)+
+   ("[[" <type-attribute> "]]")+
 
-<type-attribute-name> ::=
-   "size" | "machine_width" | "packed" | "at" "(" <constant-expression> ")" |
+<type-attribute> ::=
+   "packed" | "at" "(" <constant-expression> ")" |
    "type_invariant" "(" <boolean-expression> ")"
 
 \end{lstlisting}
@@ -915,7 +915,7 @@ type range -1000 .. 1000 coordinate_t;
 type struct {
   coordinate_t x;
   coordinate_t y;
-} point_t @type_invariant(x * x + y * y <= 1000000);
+} point_t [[type_invariant(x * x + y * y <= 1000000)]];
 
 // This ensures all point_t values satisfy the distance constraint
 // from origin: sqrt(x^2 + y^2) <= 1000
@@ -1084,15 +1084,14 @@ m[0][0] = 1;
 
 In \emph{stC}, C23-style attributes (using \verb'[[...]]' syntax) are the mechanism for specifying aspects, similar to Ada/SPARK aspects. This includes:
 \begin{itemize}
-\item \textbf{Function contracts}: \verb'pre', \verb'post', \verb'global' (with \verb'reads'/\verb'writes')
-\item \textbf{Loop contracts}: \verb'loop_invariant', \verb'loop_variant'
-\item \textbf{Type attributes}: \verb'@type_invariant', \verb'@packed', \verb'@size', \verb'@at'
-\item \textbf{Variable attributes}: \verb'@volatile', \verb'@at'
+\item \textbf{Function contracts}: \verb'[[pre(...)]]', \verb'[[post(...)]]', \verb'[[global(reads/writes => (...))]]'
+\item \textbf{Function attributes}: \verb'[[no_return]]'
+\item \textbf{Loop contracts}: \verb'[[loop_invariant(...)]]', \verb'[[loop_variant(...)]]'
+\item \textbf{Type attributes}: \verb'[[type_invariant(...)]]', \verb'[[packed]]', \verb'[[at(...)]]'
+\item \textbf{Variable attributes}: \verb'[[at(...)]]'
 \end{itemize}
 
 The \verb'[[...]]' syntax provides a familiar C-like notation while enabling the same level of specification and verification found in Ada/SPARK.
-
-\textbf{Note:} Type and variable attributes use the \verb'@' prefix syntax, while function and loop contracts use the \verb'[[...]]' syntax.
 
 \subsection{Simple Function}
 \begin{lstlisting}
@@ -1285,7 +1284,7 @@ uint32_t process_array(array_100_t arr) {
 
 \subsection{Array Attributes}
 
-Like Ada/SPARK, identifier attributes also work with arrays to query their index ranges:
+Like Ada/SPARK, identifier attributes also work with arrays to query their index ranges and length:
 
 \begin{lstlisting}
 type range 0 .. 99 index_t;
@@ -1295,10 +1294,13 @@ byte_t buffer[50];
 
 void process_buffer() {
   // For arrays, 'first returns the first index
-  index_t first_idx = buffer'first;  // Returns 0
+  index_t first_idx = buffer'first;   // Returns 0
 
   // For arrays, 'last returns the last index
-  index_t last_idx = buffer'last;    // Returns 49
+  index_t last_idx = buffer'last;     // Returns 49
+
+  // For arrays, 'length returns the number of elements
+  index_t len = buffer'length;        // Returns 50
 
   // For arrays, 'range returns the index range
   for (index_t i in buffer'range) {
@@ -1312,8 +1314,9 @@ void process_buffer() {
 \begin{itemize}
 \item \verb'identifier'first' -- For range types: returns the first value of the range. For arrays: returns the first index
 \item \verb'identifier'last' -- For range types: returns the last value of the range. For arrays: returns the last index
+\item \verb'identifier'length' -- For arrays: returns the number of elements (equivalent to \verb'last - first + 1')
 \item \verb'identifier'range' -- For range types: returns the full range. For arrays: returns the index range
-\item \verb'identifier'size' -- Returns the size in bytes (not bits)
+\item \verb'identifier'size' -- Returns the size in bytes
 \end{itemize}
 
 \section{Sizeof Operator}
