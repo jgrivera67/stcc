@@ -22,12 +22,23 @@ is
    is
       Lexer_Obj : Lexer_Type renames Compiler_Obj.Lexer_Obj;
    begin
-      Ada.Text_IO.Get (Compiler_Obj.File_Obj, Lexer_Obj.Lookahead_Char);
-      pragma Assert (Lexer_Obj.Lookahead_Char /= ASCII.NUL);
-      Lexer_Obj.Column_Number := @ + 1;
+      if Lexer_Obj.Has_Pending_Char then
+         Lexer_Obj.Lookahead_Char := Lexer_Obj.Pending_Char;
+         Lexer_Obj.Has_Pending_Char := False;
+         Lexer_Obj.Column_Number := @ + 1;
+      else
+         Ada.Text_IO.Get (Compiler_Obj.File_Obj, Lexer_Obj.Lookahead_Char);
+         pragma Assert (Lexer_Obj.Lookahead_Char /= ASCII.NUL);
+         Lexer_Obj.Column_Number := @ + 1;
+      end if;
    exception
       when Ada.Text_IO.End_Error =>
          Lexer_Obj.Lookahead_Char := ASCII.NUL;
+         --  Ensure Column_Number is valid (Positive) even after EOF;
+         --  it may be 0 if a newline reset it just before EOF was detected.
+         if Lexer_Obj.Column_Number = 0 then
+            Lexer_Obj.Column_Number := 1;
+         end if;
    end Get_Next_Char;
 
    procedure Init_Lexer (Compiler_Obj : in out Compiler_Type) is
@@ -393,9 +404,28 @@ is
                      Is_Char_Literal : Boolean := False;
                   begin
                      Ada.Text_IO.Look_Ahead (Compiler_Obj.File_Obj, Next_Char, End_Of_Line);
-                     --  If next char is graphic, might be character literal
-                     if Ada.Characters.Handling.Is_Graphic (Next_Char) and then Next_Char /= ''' then
-                        Is_Char_Literal := True;  -- Assume character literal 'x'
+                     if Ada.Characters.Handling.Is_Letter (Next_Char) then
+                        --  Could be 'X' (char literal) or 'identifier (tick attribute).
+                        --  Consume the letter, peek one more char to decide.
+                        declare
+                           Letter       : Character;
+                           After_Letter : Character;
+                           After_EOL    : Boolean;
+                        begin
+                           Ada.Text_IO.Get (Compiler_Obj.File_Obj, Letter);
+                           Ada.Text_IO.Look_Ahead (Compiler_Obj.File_Obj, After_Letter, After_EOL);
+                           --  Put the letter back via Pending_Char for Get_Next_Char
+                           Lexer_Obj.Pending_Char    := Letter;
+                           Lexer_Obj.Has_Pending_Char := True;
+                           --  If the character after the letter is a closing quote, it's 'X'
+                           if After_Letter = ''' then
+                              Is_Char_Literal := True;
+                           end if;
+                           --  Otherwise it's a tick attribute ('first, 'last, etc.)
+                        end;
+                     elsif Ada.Characters.Handling.Is_Graphic (Next_Char) and then Next_Char /= ''' then
+                        --  Non-letter graphic char: '!', '0', ' ', etc. — char literal
+                        Is_Char_Literal := True;
                      end if;
 
                      Get_Next_Char (Compiler_Obj);
@@ -772,7 +802,7 @@ is
       Reserved_Words_Table.Insert ("as", As_Token);
       Reserved_Words_Table.Insert ("at", At_Token); --  attribute
       Reserved_Words_Table.Insert ("assert", Assert_Token);
-      Reserved_Words_Table.Insert ("auto", Assert_Token);
+      Reserved_Words_Table.Insert ("auto", Auto_Token);
       Reserved_Words_Table.Insert ("bit", Bit_Token);  --  single-bit field attribute
       Reserved_Words_Table.Insert ("bits", Bits_Token);  --  multi-bit field attribute
       Reserved_Words_Table.Insert ("bool", Bool_Token);
@@ -802,15 +832,15 @@ is
       Reserved_Words_Table.Insert ("in", In_Token);
       Reserved_Words_Table.Insert ("inout", Inout_Token);
       Reserved_Words_Table.Insert ("import", Import_Token);
-      Reserved_Words_Table.Insert ("lambda", Lambda_Token);
       Reserved_Words_Table.Insert ("last", Last_Token); --  attribute
+      Reserved_Words_Table.Insert ("length", Length_Token); --  array length attribute
       Reserved_Words_Table.Insert ("loop_invariant", Loop_Invariant_Token); --  loop contract
       Reserved_Words_Table.Insert ("loop_variant", Loop_Variant_Token); --  loop contract
       --  machine_width is a built-in constant, not a keyword
       --  It's handled as an identifier by the lexer and substituted in the parser
-      Reserved_Words_Table.Insert ("mod", Mod_Token);
       Reserved_Words_Table.Insert ("modular", Modular_Token);
       Reserved_Words_Table.Insert ("module", Module_Token);
+      Reserved_Words_Table.Insert ("no_return", No_Return_Token); --  function attribute
       Reserved_Words_Table.Insert ("offset", Offset_Token);  --  bit field offset attribute
       Reserved_Words_Table.Insert ("out", Out_Token);
       Reserved_Words_Table.Insert ("packed", Packed_Token); --  attribute
@@ -823,7 +853,7 @@ is
       Reserved_Words_Table.Insert ("return", Return_Token);
       Reserved_Words_Table.Insert ("size", Size_Token); --  attribute
       Reserved_Words_Table.Insert ("sizeof", Sizeof_Token);
-      Reserved_Words_Table.Insert ("static", Struct_Token);
+      Reserved_Words_Table.Insert ("static", Static_Token);
       Reserved_Words_Table.Insert ("struct", Struct_Token);
       Reserved_Words_Table.Insert ("subtype", Subtype_Token);
       Reserved_Words_Table.Insert ("switch", Switch_Token);
@@ -831,7 +861,6 @@ is
       Reserved_Words_Table.Insert ("type", Type_Token);
       Reserved_Words_Table.Insert ("type_invariant", Type_Invariant_Token); --  type attribute
       Reserved_Words_Table.Insert ("union", Union_Token);
-      Reserved_Words_Table.Insert ("unit", Unit_Token);
       Reserved_Words_Table.Insert ("void", Void_Token);
       Reserved_Words_Table.Insert ("volatile", Volatile_Token);
       Reserved_Words_Table.Insert ("while", While_Token);

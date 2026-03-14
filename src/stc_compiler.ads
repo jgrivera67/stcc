@@ -85,8 +85,8 @@ private
       Import_Token,
       In_Token,
       Inout_Token,
-      Lambda_Token,
       Last_Token,
+      Length_Token,
       Loop_Invariant_Token,
       Loop_Variant_Token,
       Left_Curly_Brace_Token,
@@ -101,10 +101,10 @@ private
       Logical_Or_Op_Token,
       Machine_Width_Token,
       Minus_Op_Token,
-      Mod_Token,
       Modular_Token,
       Module_Token,
       Modulo_Op_Token,
+      No_Return_Token,
       Offset_Token,
       Out_Token,
       Packed_Token,
@@ -135,7 +135,6 @@ private
       Type_Token,
       Type_Invariant_Token,
       Union_Token,
-      Unit_Token,
       Void_Token,
       Volatile_Token,
       While_Token,
@@ -171,6 +170,9 @@ private
       Line_Number : Positive := 1;
       --  Current column number within the current line
       Column_Number : Natural := 0;
+      --  Single-character put-back buffer (used by apostrophe/'..' disambiguation)
+      Pending_Char : Character := ASCII.NUL;
+      Has_Pending_Char : Boolean := False;
    end record;
 
    ---------------------------------
@@ -274,6 +276,7 @@ private
       --  Attribute operators (applied with ' operator)
       AST_First_Attribute_Op,
       AST_Last_Attribute_Op,
+      AST_Length_Attribute_Op,
       AST_Range_Attribute_Op,
       AST_Size_Attribute_Op,
 

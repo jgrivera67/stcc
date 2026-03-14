@@ -34,6 +34,7 @@ package body STC_Compiler.Parser is
        --  Attribute operators have highest precedence (postfix operators)
        AST_First_Attribute_Op => Operator_Precedence_Type'Last,
        AST_Last_Attribute_Op => Operator_Precedence_Type'Last,
+       AST_Length_Attribute_Op => Operator_Precedence_Type'Last,
        AST_Range_Attribute_Op => Operator_Precedence_Type'Last,
        AST_Size_Attribute_Op => Operator_Precedence_Type'Last,
        AST_Address_Of_Op => Operator_Precedence_Type'Last - 1,
@@ -1058,6 +1059,16 @@ package body STC_Compiler.Parser is
                Var_Node.Variable_Type := Var_Type_Id;
                Var_Node.Variable_Name := Var_Name_Id;
 
+               --  Parse optional array dimensions "[" expr "]"*
+               while Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind =
+                  Left_Square_Parenthesis_Token
+               loop
+                  Lexer.Get_Next_Token (Compiler_Obj);
+                  Parse_Expression (Compiler_Obj);
+                  Expect_Token (Compiler_Obj, Right_Square_Parenthesis_Token);
+                  --  TODO: Store array dimension in Var_Node.Array_Dimensions
+               end loop;
+
                --  Parse optional [[at(address)]] attribute
                if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind =
                   Left_Double_Square_Parenthesis_Token
@@ -1562,7 +1573,7 @@ package body STC_Compiler.Parser is
                   --  The identifier is already on the operand stack
                   Lexer.Get_Next_Token (Compiler_Obj);  --  Skip '
 
-                  --  Expect attribute name (first, last, range, size)
+                  --  Expect attribute name (first, last, length, range, size)
                   declare
                      Attr_Op : AST_Operator_Type;
                   begin
@@ -1571,6 +1582,8 @@ package body STC_Compiler.Parser is
                            Attr_Op := AST_First_Attribute_Op;
                         when Last_Token =>
                            Attr_Op := AST_Last_Attribute_Op;
+                        when Length_Token =>
+                           Attr_Op := AST_Length_Attribute_Op;
                         when Range_Token =>
                            Attr_Op := AST_Range_Attribute_Op;
                         when Size_Token =>
@@ -1578,7 +1591,7 @@ package body STC_Compiler.Parser is
                         when others =>
                            Log_Compiler_Error (Compiler_Obj,
                               Current_Token_Obj,
-                              "Expected attribute name (first, last, range, size) after apostrophe");
+                              "Expected attribute name (first, last, length, range, size) after apostrophe");
                            raise Program_Error;
                      end case;
 
