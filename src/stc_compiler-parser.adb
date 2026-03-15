@@ -335,6 +335,21 @@ package body STC_Compiler.Parser is
       return Id;
    end Make_Identifier;
 
+   --  Consume any ".identifier" suffixes after a type identifier has been consumed.
+   --  E.g. after consuming "cpu" in "cpu.address_t", this consumes ".address_t".
+   procedure Skip_Qualified_Type_Suffixes (Compiler_Obj : in out Compiler_Type) is
+      Parser_Obj : Parser_Type renames Compiler_Obj.Parser_Obj;
+   begin
+      while Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Dot_Op_Token loop
+         Lexer.Get_Next_Token (Compiler_Obj);  --  Skip '.'
+         if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /= Identifier_Token then
+            Log_Compiler_Error (Compiler_Obj, "Expected identifier after '.' in qualified type name");
+            raise Program_Error;
+         end if;
+         Lexer.Get_Next_Token (Compiler_Obj);  --  Skip qualifier identifier
+      end loop;
+   end Skip_Qualified_Type_Suffixes;
+
    procedure Parse_Type_Declaration (Compiler_Obj : in out Compiler_Type;
                                      Type_Node : out AST_Node_Pointer_Type) is
       Parser_Obj : Parser_Type renames Compiler_Obj.Parser_Obj;
@@ -420,6 +435,7 @@ package body STC_Compiler.Parser is
                      end if;
                      Field_Type_Id := Make_Identifier (Compiler_Obj, Type_Identifier);
                      Lexer.Get_Next_Token (Compiler_Obj);
+                     Skip_Qualified_Type_Suffixes (Compiler_Obj);
 
                      --  Check for optional pointer "*"
                      if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Asterisk_Op_Token then
@@ -841,12 +857,77 @@ package body STC_Compiler.Parser is
          when Const_Token =>
             --  Parse constant declaration
             --  Syntax: const <type> <name> "=" <expr> ";"
+            --      or: const type <declarator> <type-name> <const-name> "=" <expr> ";"
             declare
                Var_Node    : AST_Node_Pointer_Type;
                Var_Type_Id : Identifier_Pointer_Type;
                Var_Name_Id : Identifier_Pointer_Type;
             begin
                Lexer.Get_Next_Token (Compiler_Obj);  --  Skip 'const'
+
+               --  Handle "const type <declarator> <type-id> <const-name> = <expr>;"
+               if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Type_Token then
+                  --  Parse inline type declaration, then the constant name and initializer
+                  declare
+                     Type_Decl_Node : AST_Node_Pointer_Type;
+                  begin
+                     --  Parse_Type_Declaration consumes 'type', declarator, type-name, optional
+                     --  attributes, and the terminating ';'.  We need to intercept before the ';'
+                     --  to insert the constant name.  Instead, parse the type portion manually:
+                     Lexer.Get_Next_Token (Compiler_Obj);  --  Skip 'type'
+                     Type_Decl_Node := new AST_Node_Type (AST_Type_Declaration_Node);
+
+                     --  Parse type declarator inline (same as Parse_Type_Declaration body)
+                     case Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind is
+                        when Modular_Token =>
+                           Lexer.Get_Next_Token (Compiler_Obj);
+                           Parse_Expression (Compiler_Obj);
+                        when Range_Token =>
+                           Lexer.Get_Next_Token (Compiler_Obj);
+                           Parse_Expression (Compiler_Obj);
+                           Expect_Token (Compiler_Obj, Range_Op_Token);
+                           Parse_Expression (Compiler_Obj);
+                        when others =>
+                           Log_Compiler_Error (Compiler_Obj,
+                              "Expected type declarator (modular, range, ...) in 'const type' declaration");
+                           raise Program_Error;
+                     end case;
+
+                     --  Type name (e.g. uint32_t)
+                     if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /= Identifier_Token then
+                        Log_Compiler_Error (Compiler_Obj, "Expected type name in 'const type' declaration");
+                        raise Program_Error;
+                     end if;
+                     Type_Decl_Node.Type_Name := Make_Identifier (Compiler_Obj, Type_Identifier);
+                     Lexer.Get_Next_Token (Compiler_Obj);
+
+                     --  Constant name
+                     if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /= Identifier_Token then
+                        Log_Compiler_Error (Compiler_Obj, "Expected constant name in 'const type' declaration");
+                        raise Program_Error;
+                     end if;
+                     Var_Name_Id := Make_Identifier (Compiler_Obj, Constant_Identifier);
+                     Lexer.Get_Next_Token (Compiler_Obj);
+
+                     if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /= Assignment_Op_Token then
+                        Log_Compiler_Error (Compiler_Obj, "Expected '=' in 'const type' declaration");
+                        raise Program_Error;
+                     end if;
+                     Lexer.Get_Next_Token (Compiler_Obj);
+                     Parse_Expression (Compiler_Obj);
+
+                     Var_Node := new AST_Node_Type (AST_Variable_Declaration_Node);
+                     Var_Node.Var_Is_Const    := True;
+                     Var_Node.Var_Is_Volatile := False;
+                     Var_Node.Var_Is_Pointer  := False;
+                     Var_Node.Variable_Name   := Var_Name_Id;
+                     Stack_Pop (Parser_Obj.Operand_Stack_Top, null, Var_Node.Var_Init_Value);
+
+                     Expect_Token (Compiler_Obj, Semicolon_Token);
+                     Declaration_Node := Var_Node;
+                  end;
+                  goto End_Const_Declaration;
+               end if;
 
                --  Parse type identifier (may be keyword like 'bool' or user-defined name)
                if not Is_Type_Name_Token (Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind) then
@@ -855,6 +936,7 @@ package body STC_Compiler.Parser is
                end if;
                Var_Type_Id := Make_Identifier (Compiler_Obj, Type_Identifier);
                Lexer.Get_Next_Token (Compiler_Obj);
+               Skip_Qualified_Type_Suffixes (Compiler_Obj);
 
                --  Parse constant name
                if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /= Identifier_Token then
@@ -863,6 +945,16 @@ package body STC_Compiler.Parser is
                end if;
                Var_Name_Id := Make_Identifier (Compiler_Obj, Constant_Identifier);
                Lexer.Get_Next_Token (Compiler_Obj);
+
+               --  Parse optional array dimensions "[" expr "]"*
+               while Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind =
+                  Left_Square_Parenthesis_Token
+               loop
+                  Lexer.Get_Next_Token (Compiler_Obj);
+                  Parse_Expression (Compiler_Obj);
+                  Expect_Token (Compiler_Obj, Right_Square_Parenthesis_Token);
+                  --  TODO: Store array dimension in Var_Node.Array_Dimensions
+               end loop;
 
                --  Constants require an initializer
                if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /= Assignment_Op_Token then
@@ -884,6 +976,7 @@ package body STC_Compiler.Parser is
                Expect_Token (Compiler_Obj, Semicolon_Token);
                Declaration_Node := Var_Node;
             end;
+            <<End_Const_Declaration>>
 
          when Volatile_Token =>
             --  Parse volatile variable declaration
@@ -903,6 +996,7 @@ package body STC_Compiler.Parser is
                end if;
                Var_Type_Id := Make_Identifier (Compiler_Obj, Type_Identifier);
                Lexer.Get_Next_Token (Compiler_Obj);
+               Skip_Qualified_Type_Suffixes (Compiler_Obj);
 
                --  Check for pointer "*"
                if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Asterisk_Op_Token then
@@ -963,6 +1057,7 @@ package body STC_Compiler.Parser is
                --  Parse type identifier
                Var_Type_Id := Make_Identifier (Compiler_Obj, Type_Identifier);
                Lexer.Get_Next_Token (Compiler_Obj);
+               Skip_Qualified_Type_Suffixes (Compiler_Obj);
 
                --  Check for pointer "*"
                if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Asterisk_Op_Token then
@@ -1649,7 +1744,56 @@ package body STC_Compiler.Parser is
                   pragma Assert (Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind =
                                 Right_Parenthesis_Token);
 
-               when Right_Parenthesis_Token |
+               when Left_Curly_Brace_Token =>
+                  if Is_Unary_Context then
+                     --  Aggregate literal: { expr, expr, ... }
+                     --  Parse as a sequence of expressions and create an aggregate node
+                     declare
+                        Aggregate_Node : constant AST_Node_Pointer_Type :=
+                           new AST_Node_Type (AST_Aggregate_Literal_Node);
+                        First_Element  : AST_Node_Pointer_Type := null;
+                        Last_Element   : AST_Node_Pointer_Type := null;
+                     begin
+                        Lexer.Get_Next_Token (Compiler_Obj);  --  Skip '{'
+                        loop
+                           Parse_Expression (Compiler_Obj);
+                           declare
+                              Elem_Node : AST_Node_Pointer_Type;
+                           begin
+                              Stack_Pop (Parser_Obj.Operand_Stack_Top, null, Elem_Node);
+                              if Last_Element = null then
+                                 First_Element := Elem_Node;
+                              else
+                                 Last_Element.Next_Sibling := Elem_Node;
+                              end if;
+                              Last_Element := Elem_Node;
+                           end;
+                           exit when Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /= Comma_Token;
+                           Lexer.Get_Next_Token (Compiler_Obj);  --  Skip ','
+                        end loop;
+                        --  Current token must be '}'.  Leave it for the outer loop's
+                        --  Get_Next_Token to advance past (same pattern as '(' / ')').
+                        if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /=
+                           Right_Curly_Brace_Token
+                        then
+                           Log_Compiler_Error (Compiler_Obj,
+                              Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index),
+                              "Expected '}' to close aggregate literal");
+                           raise Program_Error;
+                        end if;
+                        Aggregate_Node.Aggregate_Elements := First_Element;
+                        Operand_Stack_Push (Aggregate_Node);
+                     end;
+                  else
+                     --  Not in unary context: '{' ends the expression (e.g. function body start)
+                     while not Operator_Stack_Is_Empty loop
+                        Reduce_Operator;
+                     end loop;
+                     return;
+                  end if;
+
+               when Right_Curly_Brace_Token |
+                    Right_Parenthesis_Token |
                     Semicolon_Token |
                     Comma_Token =>
                   --  End of expression

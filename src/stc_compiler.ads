@@ -213,6 +213,7 @@ private
    ------------------------------------------------
 
    type AST_Node_Kind_Type is (
+      AST_Aggregate_Literal_Node,
       AST_Binary_Expression_Node,
       AST_Compilation_Unit_Node,
       AST_Do_While_Node,
@@ -300,6 +301,8 @@ private
       --  Pointer to next node in operand or operator stack during expression parsing
       Next_In_Stack :  AST_Node_Pointer_Type := null;
       case Node_Kind is
+         when AST_Aggregate_Literal_Node =>
+            Aggregate_Elements : AST_Node_Pointer_Type := null;
          when AST_Binary_Expression_Node =>
             Binary_Operator : AST_Operator_Type := AST_Invalid_Op;
             Left_Operand : AST_Node_Pointer_Type := null;

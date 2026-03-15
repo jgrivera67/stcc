@@ -291,8 +291,8 @@ module stdint {
 
 \chapter{\emph{stC} Grammar}
 
-%\begin{grammar}
-\begin{lstlisting}[numbersep=0pt,resetmargins=true]
+\begin{grammar}
+%\begin{lstlisting}[numbersep=0pt,resetmargins=true]
 <module> ::=
    (("private")? "import" <module-name> ("as" <module-identifier>)? ";")*
    ("private")? "module" <module-name> "{"
@@ -308,18 +308,21 @@ module stdint {
    <type-declaration> |
    <function-sig-type-declaration> |
    <subtype-declaration> |
-   <variable-declaration> |
+   <global-variable-declaration> |
    <function-declaration> |
    <foreign-variable-declaration> |
    <foreign-function-declaration> |
    <compile-if-declaration>
 
 <constant-declaration> ::=
-   "const" <type-identifier> <constant-declarator> "=" <constant-expression> ";"
+   "const" <type-identifier> <constant-declarator> "=" <constant-expression> ";" |
+   "const" "type" <type-declarator> <type-identifier> <constant-identifier>
+      "=" <constant-expression> ";"
 
 <constant-declarator> ::=
    ("*")? <constant-identifier>
-             ("[" "]" ("[" <constant-integer-expression> "]")*)? ";"
+             ("[" "]" ("[" <constant-integer-expression> "]")* |
+              "[" <constant-integer-expression> "]")*
 
 <constant-identifier> ::= "<identifier>"
 
@@ -337,7 +340,7 @@ module stdint {
       ".." <constant-integer-expression> <subtype-identifier>
       (<type-attributes>)? ";"
 
-<type-identifier> ::= "<identifier>"
+<type-identifier> ::= "<identifier>" ("." "<identifier>")*
 
 <subtype-identifier> ::= "<identifier>"
 
@@ -377,7 +380,7 @@ module stdint {
 <enum-entry-identifier> ::= "<identifier>"
 
 <global-variable-declaration> ::=
-   "<type-identifier>" <global-variable-declarator>
+   ("const" | "volatile")? <type-identifier> <global-variable-declarator>
    ("=" <constant-expression>)? (<variable-attributes>)? ";"
 
 <global-variable-declarator> ::=
@@ -398,7 +401,8 @@ module stdint {
       "{" (<local-variable-declaration> | <statement>)* "}"
 
 <local-variable-declaration> ::=
-   "<type-identifier>" <local-variable-declarator> ("=" <expression>)? ";"
+   ("volatile")? <type-identifier> <local-variable-declarator>
+   ("=" <expression>)? (<variable-attributes>)? ";"
 
 <local-variable-declarator> ::=
    ("*")? <local-variable-identifier> ("[" <index-expression> "]")*
@@ -434,7 +438,9 @@ module stdint {
 <for-statement> ::=
    "for" "(" (<local-variable-declaration> | <assignment>)? ";"
    <boolean-expression>? ";"
-   <assignment>? ")" (<loop-attributes>)? <statement-block>
+   <assignment>? ")" (<loop-attributes>)? <statement-block> |
+   "for" "(" <type-identifier> <local-variable-identifier> "in" <expression> ")"
+   (<loop-attributes>)? <statement-block>
 
 <switch-statement> ::=
    "switch" "(" <expression> ")" "{"
@@ -538,7 +544,8 @@ module stdint {
    <identifier> |
    <literal> |
    "(" <expression> ")" |
-   <type-cast-expression>
+   <type-cast-expression> |
+   "{" <expression> ("," <expression>)* "}"
 
 <type-cast-expression> ::= <type-identifier> "(" <expression> ")"
 
@@ -626,8 +633,8 @@ module stdint {
    "packed" | "at" "(" <constant-expression> ")" |
    "type_invariant" "(" <boolean-expression> ")"
 
-\end{lstlisting}
-%\end{grammar}
+%\end{lstlisting}
+\end{grammar}
 
 \chapter{Examples}
 
