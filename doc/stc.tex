@@ -292,12 +292,10 @@ module stdint {
 %\begin{grammar}
 \begin{lstlisting}[numbersep=0pt,resetmargins=true]
 <module> ::=
-   ("private")? "module" <module-name> "{"
    ("import" <module-name> ("as" <module-identifier>)? ";")*
+   ("private")? "module" <module-name> "{"
    <declaration>*
-   ("private"
-    ("import" <module-name> ";")*
-    <declaration>+)? "}"
+   ("private" <declaration>+)? "}"
 
 <module-name> ::= "<identifier>" ("." "<identifier>")*
 
@@ -634,9 +632,9 @@ module stdint {
 \section{Simple Program}
 A minimal \emph{stC} program:
 \begin{lstlisting}
-module hello {
+import stdio as io;
 
-  import stdio as io;
+module hello {
 
   foreign convention("C")
   int printf(in char* format);
@@ -1500,9 +1498,9 @@ private module geometry.internal {
 
 \begin{lstlisting}
 // File: geometry.circle.stc  (sibling -- allowed to import the private child)
-module geometry.circle {
+import geometry.internal;   // OK: sibling within geometry family
 
-  import geometry.internal;   // OK: sibling within geometry family
+module geometry.circle {
 
   type range 0 .. 1000 radius_t;
 
@@ -1515,10 +1513,10 @@ module geometry.circle {
 
 \begin{lstlisting}
 // File: app.stc  (unrelated module -- NOT allowed to import the private child)
-module app {
+import geometry.circle;    // OK: public child
+// import geometry.internal;  // ERROR: private child, not accessible here
 
-  import geometry.circle;    // OK: public child
-  // import geometry.internal;  // ERROR: private child, not accessible here
+module app {
 
 }
 \end{lstlisting}

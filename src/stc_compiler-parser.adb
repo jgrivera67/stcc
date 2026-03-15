@@ -1138,6 +1138,21 @@ package body STC_Compiler.Parser is
       Compilation_Unit_Node := new AST_Node_Type (AST_Compilation_Unit_Node);
       Parser_Obj.AST_Root := Compilation_Unit_Node;
 
+      --  Parse import declarations (outside the module body, Ada-style)
+      while Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Import_Token loop
+         Lexer.Get_Next_Token (Compiler_Obj);  --  Skip 'import'
+         --  TODO: Parse import statement
+         Log_Message ("Parsing import (not yet fully implemented)");
+         --  Skip to semicolon
+         while Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /= Semicolon_Token and then
+               Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /= End_Of_File_Token loop
+            Lexer.Get_Next_Token (Compiler_Obj);
+         end loop;
+         if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Semicolon_Token then
+            Lexer.Get_Next_Token (Compiler_Obj);
+         end if;
+      end loop;
+
       --  Expect "module <name> {"
       if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /= Module_Token then
          Log_Compiler_Error (Compiler_Obj, "Expected 'module' keyword at start of file");
@@ -1156,21 +1171,6 @@ package body STC_Compiler.Parser is
       --  TODO: Handle dotted names for child modules (module parent.child {)
 
       Expect_Token (Compiler_Obj, Left_Curly_Brace_Token);
-
-      --  Parse import declarations
-      while Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Import_Token loop
-         Lexer.Get_Next_Token (Compiler_Obj);  --  Skip 'import'
-         --  TODO: Parse import statement
-         Log_Message ("Parsing import (not yet fully implemented)");
-         --  Skip to semicolon
-         while Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /= Semicolon_Token and then
-               Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /= End_Of_File_Token loop
-            Lexer.Get_Next_Token (Compiler_Obj);
-         end loop;
-         if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Semicolon_Token then
-            Lexer.Get_Next_Token (Compiler_Obj);
-         end if;
-      end loop;
 
       --  Parse public declarations
       while Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /= Private_Token and then
