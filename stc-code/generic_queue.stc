@@ -1,0 +1,49 @@
+//
+//  generic_queue.stc -- Generic fixed-capacity queue with type and const formals
+//
+//  Demonstrates stC generic modules with type and const formal parameters.
+//  The queue is parameterised over the element type T and a fixed capacity,
+//  matching Ada's generic formal object (constant) syntax.
+//
+//  Instantiation (in a consumer module):
+//
+//    import generic_queue(T => uint8_t, Capacity => 64) as Byte_Queue;
+//
+
+import stdint;
+
+generic(type T, const uint32_t Capacity)
+module Fixed_Queue {
+
+   type struct {
+      T items[Capacity];
+      uint32_t head;
+      uint32_t tail;
+      uint32_t count;
+   } queue_t;
+
+   void init(inout queue_t q)
+   {
+   }
+
+   bool enqueue(inout queue_t q, in T item)
+   {
+      return false;
+   }
+
+   bool dequeue(inout queue_t q, out T item)
+   {
+      return false;
+   }
+
+   bool is_full(in queue_t q)
+   {
+      return false;
+   }
+
+   bool is_empty(in queue_t q)
+   {
+      return false;
+   }
+
+}

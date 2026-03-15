@@ -1,0 +1,30 @@
+//
+//  generic_sort.stc -- Generic sorting module with a function formal parameter
+//
+//  Demonstrates stC generic modules with type and function formals.
+//  The sort algorithm is parameterised over the element type T and a
+//  comparison function less_than, matching Ada's generic formal subprogram
+//  syntax but using C-like declaration style.
+//
+//  Instantiation (in a consumer module):
+//
+//    import generic_sort(T => int32_t, less_than => int32_less) as Int_Sort;
+//
+
+import stdint;
+
+generic(type T, bool less_than(in T a, in T b))
+module Sort_Utils {
+
+   //  Sort an array of T in ascending order using the provided comparator.
+   void sort(inout T arr[], in uint32_t len)
+   {
+   }
+
+   //  Returns true if the array is sorted in ascending order.
+   bool is_sorted(in T arr[], in uint32_t len)
+   {
+      return true;
+   }
+
+}

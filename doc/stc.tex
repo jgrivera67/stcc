@@ -148,19 +148,19 @@ The lexical structure of \emph{stC} consists of the following token types:
 The following identifiers are reserved as keywords and cannot be used as identifiers:
 
 \begin{lstlisting}
-as              assert          auto            bit             bits
-bool            break           case            char            compile_if
-const           continue        convention      decimal         default
-delta           digits          do              else            enum
-false           first           fixed           float           for
-foreign         global          goto            if              import
-in              inout           last            loop_invariant
-loop_variant    modular         module          offset          out
-packed          post            pre             private         range
-reads           renames         return          size            sizeof
-static          struct          subtype         switch          true
-type            type_invariant  union           void            volatile
-while           writes
+abstract_state  as              assert          auto            bit
+bits            bool            break           case            char
+compile_if      const           continue        convention      decimal
+default         delta           depends         digits          do
+else            enum            false           first           fixed
+float           for             foreign         generic         global
+goto            if              import          in              inout
+last            loop_invariant  loop_variant    modular         module
+offset          out             packed          post            pre
+private         range           reads           refined_state   renames
+return          size            sizeof          static          struct
+subtype         switch          true            type            type_invariant
+union           void            volatile        while           writes
 \end{lstlisting}
 
 Note: \verb'machine_width' is not a keyword but a built-in constant (see section on Built-in Constants).
@@ -304,10 +304,34 @@ module stdint {
 
 \begin{grammar}
 <module> ::=
-   (("private")? "import" <module-name> ("as" <module-identifier>)? ";")*
-   ("private")? "module" <module-name> "{"
+   (("private")? "import" <module-name> (<generic-actual-part>)?
+      ("as" <module-identifier>)? ";")*
+   (<generic-formal-part>)?
+   ("private")? "module" <module-name> (<module-attributes>)? "{"
    <declaration>*
    ("private" <declaration>+)? "}"
+
+<generic-formal-part> ::=
+   "generic" "(" <generic-formal-parameter> ("," <generic-formal-parameter>)* ")"
+
+<generic-formal-parameter> ::=
+   "type" <type-identifier> |
+   "const" <type-identifier> <constant-identifier> |
+   <type-identifier> <function-identifier>
+      "(" (<param-declaration> ("," <param-declaration>)*)? ")"
+
+<function-identifier> ::= "<identifier>"
+
+<generic-actual-part> ::=
+   "(" <generic-actual-parameter> ("," <generic-actual-parameter>)* ")"
+
+<generic-actual-parameter> ::=
+   "<identifier>" "=>" ("<identifier>" | <constant-expression>)
+
+<module-attributes> ::= ("[[" <module-attribute> "]]")+
+
+<module-attribute> ::=
+   "abstract_state" "(" <identifier> ("," <identifier>)* ")"
 
 <module-name> ::= "<identifier>" ("." "<identifier>")*
 
@@ -602,7 +626,9 @@ module stdint {
 <variable-attributes> ::=
    ("[[" <variable-attribute> "]]")+
 
-<variable-attribute> ::= "at" "(" <constant-expression> ")"
+<variable-attribute> ::=
+   "at" "(" <constant-expression> ")" |
+   "refined_state" "(" "<identifier>" ")"
 
 <function-attributes> ::=
    <function-attribute>+
@@ -611,7 +637,19 @@ module stdint {
    "[[" (<function-contract> | "no_return") "]]"
 
 <function-contract> ::=
-   <precondition> | <postcondition> | <global-clause>
+   <precondition> | <postcondition> | <global-clause> | <depends-clause>
+
+<depends-clause> ::=
+   "depends" "(" <depends-item> ("," <depends-item>)* ")"
+
+<depends-item> ::=
+   <depends-output> "=>" <depends-rhs>
+
+<depends-output> ::=
+   "<identifier>" | "(" "<identifier>" ("," "<identifier>")* ")"
+
+<depends-rhs> ::=
+   "void" | "<identifier>" | "(" "<identifier>" ("," "<identifier>")* ")"
 
 <precondition> ::= "pre" "(" <boolean-expression> ")"
 
@@ -1609,6 +1647,123 @@ module numeric_separators {
   // type modular 0x8000_0'000 invalid_t;  // Error: mixed separators
 
 }
+\end{lstlisting}
+
+\section{Depends Contracts}
+Information-flow contracts specify which outputs depend on which inputs, enabling
+formal verification of data-flow properties.  This maps directly to SPARK's
+\verb'Depends' aspect.
+
+\begin{lstlisting}
+module depends_example {
+
+  // swap: each output depends on both inputs.
+  // x => (x, y) is stC's way of expressing SPARK's x =>+ y
+  // (output depends on inputs AND its own initial value).
+  void swap(inout int32_t x, inout int32_t y)
+    [[depends(x => (x, y), y => (x, y))]]
+  {
+    int32_t tmp = x;
+    x = y;
+    y = tmp;
+  }
+
+  // clear: result is independent of all inputs
+  void clear(out int32_t result)
+    [[depends(result => void)]]
+  {
+    result = 0;
+  }
+
+  // copy: dst depends solely on src
+  void copy(out int32_t dst, in int32_t src)
+    [[depends(dst => src)]]
+  {
+    dst = src;
+  }
+
+}
+\end{lstlisting}
+
+\textbf{Note:} SPARK's \verb'=>+' syntax (\emph{``output depends on inputs and on its
+own prior value''}) is expressed in \emph{stC} by including the output variable in its
+own input list.  For example, \verb'x => (x, y)' is equivalent to SPARK's
+\verb'x =>+ y'.  The explicit form is preferred because it is unambiguous and
+familiar to C programmers.
+
+\section{Abstract State and Refined State}
+Large modules can hide their internal variables behind an abstract state name,
+enabling callers to write information-flow contracts at the module interface
+level without knowing the concrete implementation variables.  This maps to
+SPARK's \verb'Abstract_State' and \verb'Refined_State' aspects.
+
+\begin{lstlisting}
+module Server [[abstract_state(State)]] {
+
+  // Public interface refers only to the abstract state name.
+  void init()   [[global(writes => (State))]] {}
+  void push(in uint8_t val)
+               [[global(writes => (State))]] {}
+  uint32_t count()
+               [[global(reads => (State))]]  { return 0; }
+
+  private
+
+  // Private variables are tagged with the abstract state they refine.
+  uint8_t  buffer[64] [[refined_state(State)]];
+  uint32_t head       [[refined_state(State)]];
+  uint32_t tail       [[refined_state(State)]];
+
+}
+\end{lstlisting}
+
+\section{Generic Modules}
+\emph{stC} supports parameterised modules using C-style generic formal parameter
+syntax.  Generics are instantiated via \verb'import' with named actual
+parameters.
+
+\subsection{Type and Function Formals}
+
+\begin{lstlisting}
+generic(type T, bool less_than(in T a, in T b))
+module Sort_Utils {
+
+  void sort(inout T arr[], in uint32_t len) {}
+  bool is_sorted(in T arr[], in uint32_t len) { return true; }
+
+}
+\end{lstlisting}
+
+Instantiate with named actual parameters using \verb'=>':
+
+\begin{lstlisting}
+import Sort_Utils(T => int32_t, less_than => int32_less) as Int_Sort;
+\end{lstlisting}
+
+\subsection{Type and Const Formals}
+
+\begin{lstlisting}
+generic(type T, const uint32_t Capacity)
+module Fixed_Queue {
+
+  type struct {
+    T items[Capacity];
+    uint32_t head;
+    uint32_t tail;
+    uint32_t count;
+  } queue_t;
+
+  void  init(inout queue_t q)              {}
+  bool  enqueue(inout queue_t q, in T item){ return false; }
+  bool  dequeue(inout queue_t q, out T item){ return false; }
+
+}
+\end{lstlisting}
+
+Instantiate as:
+
+\begin{lstlisting}
+import Fixed_Queue(T => uint8_t, Capacity => 64) as Byte_Queue;
 \end{lstlisting}
 
 \begin{thebibliography}{9}

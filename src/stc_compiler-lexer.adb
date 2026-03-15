@@ -817,6 +817,8 @@ is
       Reserved_Words_Table.Insert ("default", Default_Token);
       Reserved_Words_Table.Insert ("delta", Delta_Token);
       Reserved_Words_Table.Insert ("digits", Digits_Token);
+      Reserved_Words_Table.Insert ("abstract_state", Abstract_State_Token); --  module attribute
+      Reserved_Words_Table.Insert ("depends", Depends_Token); --  contract clause
       Reserved_Words_Table.Insert ("do", Do_Token);
       Reserved_Words_Table.Insert ("else", Else_Token);
       Reserved_Words_Table.Insert ("enum", Enum_Token);
@@ -826,6 +828,7 @@ is
       Reserved_Words_Table.Insert ("float", Float_Token);
       Reserved_Words_Table.Insert ("for", For_Token);
       Reserved_Words_Table.Insert ("foreign", Foreign_Token);
+      Reserved_Words_Table.Insert ("generic", Generic_Token); --  generic formal part
       Reserved_Words_Table.Insert ("global", Global_Token); --  contract clause
       Reserved_Words_Table.Insert ("goto", Goto_Token);
       Reserved_Words_Table.Insert ("if", If_Token);
@@ -849,6 +852,7 @@ is
       Reserved_Words_Table.Insert ("private", Private_Token);
       Reserved_Words_Table.Insert ("range", Range_Token);
       Reserved_Words_Table.Insert ("reads", Reads_Token); --  contract clause
+      Reserved_Words_Table.Insert ("refined_state", Refined_State_Token); --  variable attribute
       Reserved_Words_Table.Insert ("renames", Renames_Token);
       Reserved_Words_Table.Insert ("return", Return_Token);
       Reserved_Words_Table.Insert ("size", Size_Token); --  attribute

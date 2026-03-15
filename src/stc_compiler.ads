@@ -18,6 +18,7 @@ private
    type String_Pointer_Type is access String;
 
    type Token_Kind_Type is (
+      Abstract_State_Token,
       Ampersand_Op_Token,
       Apostrophe_Op_Token,
       Arrow_Op_Token,
@@ -60,6 +61,7 @@ private
       Decimal_Integer_Literal_Token,
       Default_Token,
       Delta_Token,
+      Depends_Token,
       Digits_Token,
       Divide_Op_Token,
       Do_Token,
@@ -75,6 +77,7 @@ private
       Floating_Point_Literal_Token,
       For_Token,
       Foreign_Token,
+      Generic_Token,
       Global_Token,
       Goto_Token,
       Greater_Than_Op_Token,
@@ -117,6 +120,7 @@ private
       Range_Token,
       Range_Op_Token,
       Reads_Token,
+      Refined_State_Token,
       Renames_Token,
       Return_Token,
       Right_Curly_Brace_Token,
@@ -197,6 +201,7 @@ private
       Name : String_Pointer_Type := null;  --  Identifier name string
       Declaration : AST_Node_Pointer_Type := null;
       Scope : AST_Node_Pointer_Type := null; --  Pointer to Statement_Block_Node if local scope
+      Next : access Identifier_Type := null; --  For linked lists of identifiers
    end record;
 
    type Identifier_Pointer_Type is access Identifier_Type;
@@ -216,15 +221,22 @@ private
       AST_Aggregate_Literal_Node,
       AST_Binary_Expression_Node,
       AST_Compilation_Unit_Node,
+      AST_Depends_Contract_Node,
+      AST_Depends_Item_Node,
       AST_Do_While_Node,
       AST_Field_Attribute_Node,
       AST_For_Node,
       AST_Function_Call_Node,
       AST_Function_Declaration_Node,
       AST_Functional_If_Else_Node,
+      AST_Generic_Formal_Const_Node,
+      AST_Generic_Formal_Function_Node,
+      AST_Generic_Formal_Part_Node,
+      AST_Generic_Formal_Type_Node,
       AST_Global_Contract_Node,
       AST_If_Node,
       AST_Literal_Node,
+      AST_Module_Attribute_Node,
       AST_Statement_Block_Node,
       AST_Struct_Field_Node,
       AST_Switch_Node,
@@ -307,6 +319,12 @@ private
             Binary_Operator : AST_Operator_Type := AST_Invalid_Op;
             Left_Operand : AST_Node_Pointer_Type := null;
             Right_Operand : AST_Node_Pointer_Type := null;
+         when AST_Depends_Contract_Node =>
+            First_Depends_Item : AST_Node_Pointer_Type := null;
+         when AST_Depends_Item_Node =>
+            Depends_Output_List : AST_Node_Pointer_Type := null;  --  linked via Next_Sibling
+            Depends_Input_List  : AST_Node_Pointer_Type := null;  --  linked via Next_Sibling; null when void
+            Is_Void_Dep : Boolean := False;
          when AST_Compilation_Unit_Node =>
             Unit_Name_First_Identifier : Identifier_Pointer_Type := null; --  Compilation unit name???
             Alias_Name : Identifier_Pointer_Type := null;
@@ -315,6 +333,8 @@ private
             First_Private_Import : AST_Node_Pointer_Type := null;
             First_Private_Declaration : AST_Node_Pointer_Type := null;
             Global_Symbol_Table : Symbol_Table_Type;
+            Generic_Formal_Part : AST_Node_Pointer_Type := null;
+            Module_Attributes : AST_Node_Pointer_Type := null;
          when AST_Do_While_Node =>
             Do_While_Body : AST_Node_Pointer_Type := null;
             Do_While_Condition : AST_Node_Pointer_Type := null;
@@ -335,13 +355,28 @@ private
             Precondition : AST_Node_Pointer_Type := null;
             Postcondition : AST_Node_Pointer_Type := null;
             First_Global_Clause : AST_Node_Pointer_Type := null;  --  Linked list of Global_Contract_Node
+            Depends_Contract : AST_Node_Pointer_Type := null;
          when AST_Functional_If_Else_Node =>
             Functional_If_Condition : AST_Node_Pointer_Type := null;
             Functional_If_True_Operand : AST_Node_Pointer_Type := null;
             Functional_If_False_Operand : AST_Node_Pointer_Type := null;
+         when AST_Generic_Formal_Part_Node =>
+            First_Generic_Formal : AST_Node_Pointer_Type := null;  --  linked via Next_Sibling
+         when AST_Generic_Formal_Type_Node =>
+            Generic_Type_Name : Identifier_Pointer_Type := null;   --  the T in "type T"
+         when AST_Generic_Formal_Function_Node =>
+            Generic_Function_Name    : Identifier_Pointer_Type := null;
+            Generic_Function_Params  : AST_Node_Pointer_Type := null;
+            Generic_Function_Return  : Identifier_Pointer_Type := null;
+         when AST_Generic_Formal_Const_Node =>
+            Generic_Const_Type : Identifier_Pointer_Type := null;
+            Generic_Const_Name : Identifier_Pointer_Type := null;
          when AST_Global_Contract_Node =>
             Is_Reads : Boolean := False;  --  True for reads, False for writes
             First_Global_Variable : Identifier_Pointer_Type := null;  --  Linked via Identifier.Next
+         when AST_Module_Attribute_Node =>
+            Module_Attr_Kind : Token_Kind_Type := Abstract_State_Token;
+            First_State_Name : Identifier_Pointer_Type := null;  --  linked via Identifier.Next
          when AST_If_Node =>
             If_Condition : AST_Node_Pointer_Type := null;
             Then_Body : AST_Node_Pointer_Type := null;

@@ -155,6 +155,21 @@ package body STC_Compiler.Parser is
                                        Contract_Node : out AST_Node_Pointer_Type);
    pragma Warnings (On, "procedure ""Parse_Contract_Attribute"" is not referenced");
 
+   pragma Warnings (Off, "procedure ""Parse_Depends_Clause"" is not referenced");
+   procedure Parse_Depends_Clause (Compiler_Obj : in out Compiler_Type;
+                                   Depends_Node : out AST_Node_Pointer_Type);
+   pragma Warnings (On, "procedure ""Parse_Depends_Clause"" is not referenced");
+
+   pragma Warnings (Off, "procedure ""Parse_Module_Attributes"" is not referenced");
+   procedure Parse_Module_Attributes (Compiler_Obj : in out Compiler_Type;
+                                      Compilation_Unit_Node : AST_Node_Pointer_Type);
+   pragma Warnings (On, "procedure ""Parse_Module_Attributes"" is not referenced");
+
+   pragma Warnings (Off, "procedure ""Parse_Generic_Formal_Part"" is not referenced");
+   procedure Parse_Generic_Formal_Part (Compiler_Obj : in out Compiler_Type;
+                                        Formal_Part_Node : out AST_Node_Pointer_Type);
+   pragma Warnings (On, "procedure ""Parse_Generic_Formal_Part"" is not referenced");
+
    procedure Expect_Token (Compiler_Obj : in out Compiler_Type;
                           Expected : Token_Kind_Type) is
       Parser_Obj : Parser_Type renames Compiler_Obj.Parser_Obj;
@@ -688,8 +703,30 @@ package body STC_Compiler.Parser is
                Stack_Pop (Parser_Obj.Operand_Stack_Top, null, Attr_Node.Byte_Offset);
                Expect_Token (Compiler_Obj, Right_Parenthesis_Token);
 
+            when Refined_State_Token =>
+               --  Parse: [[refined_state(abstract_state_name)]]
+               Attr_Node.Attribute_Kind := Refined_State_Token;
+               Lexer.Get_Next_Token (Compiler_Obj);  --  Skip 'refined_state'
+               Expect_Token (Compiler_Obj, Left_Parenthesis_Token);
+               if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /= Identifier_Token then
+                  Log_Compiler_Error (Compiler_Obj,
+                     Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index),
+                     "Expected abstract state name in refined_state attribute");
+                  raise Program_Error;
+               end if;
+               --  TODO: resolve abstract state identifier; store placeholder in Byte_Offset
+               declare
+                  Ref_Node : constant AST_Node_Pointer_Type :=
+                     new AST_Node_Type (AST_Variable_Reference_Node);
+               begin
+                  Attr_Node.Byte_Offset := Ref_Node;
+               end;
+               Lexer.Get_Next_Token (Compiler_Obj);  --  Skip identifier
+               Expect_Token (Compiler_Obj, Right_Parenthesis_Token);
+
             when others =>
-               Log_Compiler_Error (Compiler_Obj, "Invalid variable attribute (expected 'at')");
+               Log_Compiler_Error (Compiler_Obj,
+                  "Invalid variable attribute (expected 'at' or 'refined_state')");
                raise Program_Error;
          end case;
 
@@ -704,6 +741,397 @@ package body STC_Compiler.Parser is
          Last_Attr := Attr_Node;
       end loop;
    end Parse_Variable_Attributes;
+
+   --  Parse module-level [[...]] attributes following the module name.
+   --  Currently supports: [[abstract_state(Name1, Name2, ...)]]
+   --  Current token on entry: Left_Double_Square_Parenthesis_Token (or not, in which case returns)
+   --  Parse a generic formal part: generic(formal, formal, ...)
+   --  Formal kinds (C-style):
+   --    type <type-identifier>
+   --    const <type-identifier> <const-identifier>
+   --    <return-type> <function-identifier> ( [mode <type> <name>, ...] )
+   --  Current token on entry: Generic_Token
+   --  Current token on exit: Module_Token
+   procedure Parse_Generic_Formal_Part (Compiler_Obj : in out Compiler_Type;
+                                        Formal_Part_Node : out AST_Node_Pointer_Type)
+   is
+      Parser_Obj : Parser_Type renames Compiler_Obj.Parser_Obj;
+
+      function Current_Kind return Token_Kind_Type is
+        (Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind);
+
+      Part_Node   : constant AST_Node_Pointer_Type :=
+         new AST_Node_Type (AST_Generic_Formal_Part_Node);
+      Last_Formal : AST_Node_Pointer_Type := null;
+   begin
+      Formal_Part_Node := Part_Node;
+      Lexer.Get_Next_Token (Compiler_Obj);  --  Skip 'generic'
+      Expect_Token (Compiler_Obj, Left_Parenthesis_Token);
+
+      loop
+         declare
+            Formal_Node : AST_Node_Pointer_Type;
+         begin
+            case Current_Kind is
+               when Type_Token =>
+                  --  type formal: "type <type-identifier>"
+                  declare
+                     N : constant AST_Node_Pointer_Type :=
+                        new AST_Node_Type (AST_Generic_Formal_Type_Node);
+                  begin
+                     Lexer.Get_Next_Token (Compiler_Obj);  --  Skip 'type'
+                     if Current_Kind /= Identifier_Token then
+                        Log_Compiler_Error (Compiler_Obj,
+                           Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index),
+                           "Expected type parameter name after 'type'");
+                        raise Program_Error;
+                     end if;
+                     N.Generic_Type_Name := Make_Identifier (Compiler_Obj, Type_Identifier);
+                     Lexer.Get_Next_Token (Compiler_Obj);  --  Skip identifier
+                     Formal_Node := N;
+                  end;
+
+               when Const_Token =>
+                  --  const formal: "const <type-identifier> <const-identifier>"
+                  declare
+                     N : constant AST_Node_Pointer_Type :=
+                        new AST_Node_Type (AST_Generic_Formal_Const_Node);
+                  begin
+                     Lexer.Get_Next_Token (Compiler_Obj);  --  Skip 'const'
+                     if not Is_Type_Name_Token (Current_Kind) then
+                        Log_Compiler_Error (Compiler_Obj,
+                           Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index),
+                           "Expected type name in const generic formal");
+                        raise Program_Error;
+                     end if;
+                     N.Generic_Const_Type := Make_Identifier (Compiler_Obj, Type_Identifier);
+                     Lexer.Get_Next_Token (Compiler_Obj);
+                     Skip_Qualified_Type_Suffixes (Compiler_Obj);
+                     if Current_Kind /= Identifier_Token then
+                        Log_Compiler_Error (Compiler_Obj,
+                           Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index),
+                           "Expected const parameter name");
+                        raise Program_Error;
+                     end if;
+                     N.Generic_Const_Name := Make_Identifier (Compiler_Obj, Constant_Identifier);
+                     Lexer.Get_Next_Token (Compiler_Obj);  --  Skip name
+                     Formal_Node := N;
+                  end;
+
+               when others =>
+                  --  Function formal: "<return-type> <func-name> ( [params] )"
+                  if not Is_Type_Name_Token (Current_Kind) then
+                     Log_Compiler_Error (Compiler_Obj,
+                        Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index),
+                        "Expected 'type', 'const', or a return type in generic formal");
+                     raise Program_Error;
+                  end if;
+                  declare
+                     N         : constant AST_Node_Pointer_Type :=
+                        new AST_Node_Type (AST_Generic_Formal_Function_Node);
+                     Last_Param : AST_Node_Pointer_Type := null;
+                  begin
+                     N.Generic_Function_Return :=
+                        Make_Identifier (Compiler_Obj, Type_Identifier);
+                     Lexer.Get_Next_Token (Compiler_Obj);  --  Skip return type
+                     Skip_Qualified_Type_Suffixes (Compiler_Obj);
+                     if Current_Kind /= Identifier_Token then
+                        Log_Compiler_Error (Compiler_Obj,
+                           Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index),
+                           "Expected function name in generic formal");
+                        raise Program_Error;
+                     end if;
+                     N.Generic_Function_Name :=
+                        Make_Identifier (Compiler_Obj, Function_Identifier);
+                     Lexer.Get_Next_Token (Compiler_Obj);  --  Skip function name
+                     Expect_Token (Compiler_Obj, Left_Parenthesis_Token);
+
+                     --  Parse optional parameter list: [in|out|inout <type> <name>, ...]
+                     while Current_Kind /= Right_Parenthesis_Token and then
+                           Current_Kind /= End_Of_File_Token
+                     loop
+                        --  Skip optional mode keyword
+                        if Current_Kind = In_Token or else
+                           Current_Kind = Out_Token or else
+                           Current_Kind = Inout_Token
+                        then
+                           Lexer.Get_Next_Token (Compiler_Obj);  --  Skip mode
+                        end if;
+
+                        --  Parse parameter type
+                        if not Is_Type_Name_Token (Current_Kind) then
+                           Log_Compiler_Error (Compiler_Obj,
+                              Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index),
+                              "Expected parameter type in generic function formal");
+                           raise Program_Error;
+                        end if;
+                        declare
+                           Param_Type : constant Identifier_Pointer_Type :=
+                              Make_Identifier (Compiler_Obj, Type_Identifier);
+                           Param_Node : constant AST_Node_Pointer_Type :=
+                              new AST_Node_Type (AST_Variable_Declaration_Node);
+                        begin
+                           Lexer.Get_Next_Token (Compiler_Obj);
+                           Skip_Qualified_Type_Suffixes (Compiler_Obj);
+                           Param_Node.Variable_Type := Param_Type;
+
+                           --  Parse parameter name
+                           if Current_Kind /= Identifier_Token then
+                              Log_Compiler_Error (Compiler_Obj,
+                                 Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index),
+                                 "Expected parameter name in generic function formal");
+                              raise Program_Error;
+                           end if;
+                           Param_Node.Variable_Name :=
+                              Make_Identifier (Compiler_Obj, Variable_Identifier);
+                           Lexer.Get_Next_Token (Compiler_Obj);  --  Skip parameter name
+
+                           --  Link param into function formal
+                           if N.Generic_Function_Params = null then
+                              N.Generic_Function_Params := Param_Node;
+                           else
+                              Last_Param.Next_Sibling := Param_Node;
+                           end if;
+                           Last_Param := Param_Node;
+                        end;
+
+                        exit when Current_Kind /= Comma_Token;
+                        Lexer.Get_Next_Token (Compiler_Obj);  --  Skip ','
+                     end loop;
+
+                     Expect_Token (Compiler_Obj, Right_Parenthesis_Token);
+                     Formal_Node := N;
+                  end;
+            end case;
+
+            --  Link formal to list
+            if Part_Node.First_Generic_Formal = null then
+               Part_Node.First_Generic_Formal := Formal_Node;
+            else
+               Last_Formal.Next_Sibling := Formal_Node;
+            end if;
+            Last_Formal := Formal_Node;
+         end;
+
+         exit when Current_Kind /= Comma_Token;
+         Lexer.Get_Next_Token (Compiler_Obj);  --  Skip ','
+      end loop;
+
+      Expect_Token (Compiler_Obj, Right_Parenthesis_Token);
+   end Parse_Generic_Formal_Part;
+
+   --  Current token on exit: Left_Curly_Brace_Token (ready for Expect_Token call)
+   procedure Parse_Module_Attributes (Compiler_Obj : in out Compiler_Type;
+                                      Compilation_Unit_Node : AST_Node_Pointer_Type)
+   is
+      Parser_Obj : Parser_Type renames Compiler_Obj.Parser_Obj;
+      Last_Attr : AST_Node_Pointer_Type := null;
+   begin
+      --  Use direct indexing (not a frozen rename) so each check re-reads
+      --  the current token after Get_Next_Token advances.
+      while Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind =
+            Left_Double_Square_Parenthesis_Token
+      loop
+         Lexer.Get_Next_Token (Compiler_Obj);  --  Skip [[
+
+         case Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind is
+            when Abstract_State_Token =>
+               declare
+                  Attr_Node : constant AST_Node_Pointer_Type :=
+                     new AST_Node_Type (AST_Module_Attribute_Node);
+                  Last_Name : access Identifier_Type := null;
+               begin
+                  Attr_Node.Module_Attr_Kind := Abstract_State_Token;
+                  Lexer.Get_Next_Token (Compiler_Obj);  --  Skip 'abstract_state'
+                  Expect_Token (Compiler_Obj, Left_Parenthesis_Token);
+
+                  --  Parse comma-separated list of state names
+                  loop
+                     if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /=
+                        Identifier_Token
+                     then
+                        Log_Compiler_Error (Compiler_Obj,
+                           Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index),
+                           "Expected state name in abstract_state attribute");
+                        raise Program_Error;
+                     end if;
+                     declare
+                        State_Id : constant Identifier_Pointer_Type :=
+                           Make_Identifier (Compiler_Obj, Type_Identifier);
+                     begin
+                        Lexer.Get_Next_Token (Compiler_Obj);  --  Skip identifier
+                        if Attr_Node.First_State_Name = null then
+                           Attr_Node.First_State_Name := State_Id;
+                        else
+                           Last_Name.Next := State_Id;
+                        end if;
+                        Last_Name := State_Id;
+                     end;
+                     exit when Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /=
+                        Comma_Token;
+                     Lexer.Get_Next_Token (Compiler_Obj);  --  Skip ','
+                  end loop;
+
+                  Expect_Token (Compiler_Obj, Right_Parenthesis_Token);
+                  Expect_Token (Compiler_Obj, Right_Double_Square_Parenthesis_Token);
+
+                  --  Link attribute to compilation unit
+                  if Compilation_Unit_Node.Module_Attributes = null then
+                     Compilation_Unit_Node.Module_Attributes := Attr_Node;
+                  else
+                     Last_Attr.Next_Sibling := Attr_Node;
+                  end if;
+                  Last_Attr := Attr_Node;
+               end;
+
+            when others =>
+               Log_Compiler_Error (Compiler_Obj,
+                  Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index),
+                  "Unknown module attribute (expected 'abstract_state')");
+               raise Program_Error;
+         end case;
+      end loop;
+   end Parse_Module_Attributes;
+
+   --  Parse a depends clause: depends(output => rhs, ...)
+   --  where rhs is: void | identifier | (identifier, ...)
+   --  Current token on entry: Depends_Token
+   --  Current token on exit: token after closing ')'
+   procedure Parse_Depends_Clause (Compiler_Obj : in out Compiler_Type;
+                                   Depends_Node : out AST_Node_Pointer_Type)
+   is
+      Parser_Obj : Parser_Type renames Compiler_Obj.Parser_Obj;
+
+      --  Helper: return the kind of the current token, re-evaluating each call.
+      function Current_Kind return Token_Kind_Type is
+        (Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind);
+
+      --  Consume the current identifier token and return a placeholder
+      --  variable-reference node.  Name resolution is a later compiler pass.
+      function Parse_Identifier_List_Item return AST_Node_Pointer_Type is
+         Var_Node : constant AST_Node_Pointer_Type :=
+            new AST_Node_Type (AST_Variable_Reference_Node);
+      begin
+         --  TODO: resolve identifier to its declaration and store in Var_Node.Variable
+         Lexer.Get_Next_Token (Compiler_Obj);  --  Skip identifier
+         return Var_Node;
+      end Parse_Identifier_List_Item;
+
+      Contract_Node  : constant AST_Node_Pointer_Type :=
+         new AST_Node_Type (AST_Depends_Contract_Node);
+      Last_Item      : AST_Node_Pointer_Type := null;
+   begin
+      Depends_Node := Contract_Node;
+      Lexer.Get_Next_Token (Compiler_Obj);  --  Skip 'depends'
+      Expect_Token (Compiler_Obj, Left_Parenthesis_Token);  --  Consume '('
+
+      --  Parse one or more depends items: output => rhs
+      loop
+         declare
+            Item_Node : constant AST_Node_Pointer_Type :=
+               new AST_Node_Type (AST_Depends_Item_Node);
+            Last_Output : AST_Node_Pointer_Type := null;
+         begin
+            --  Parse output identifier or parenthesised output list
+            if Current_Kind = Left_Parenthesis_Token then
+               Lexer.Get_Next_Token (Compiler_Obj);  --  Skip '('
+               loop
+                  if Current_Kind /= Identifier_Token then
+                     Log_Compiler_Error (Compiler_Obj, Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index),
+                        "Expected output identifier in depends clause");
+                     raise Program_Error;
+                  end if;
+                  declare
+                     Out_Node : constant AST_Node_Pointer_Type :=
+                        Parse_Identifier_List_Item;
+                  begin
+                     if Item_Node.Depends_Output_List = null then
+                        Item_Node.Depends_Output_List := Out_Node;
+                     else
+                        Last_Output.Next_Sibling := Out_Node;
+                     end if;
+                     Last_Output := Out_Node;
+                  end;
+                  exit when Current_Kind /= Comma_Token;
+                  Lexer.Get_Next_Token (Compiler_Obj);  --  Skip ','
+               end loop;
+               Expect_Token (Compiler_Obj, Right_Parenthesis_Token);
+            elsif Current_Kind = Identifier_Token then
+               declare
+                  Out_Node : constant AST_Node_Pointer_Type :=
+                     Parse_Identifier_List_Item;
+               begin
+                  Item_Node.Depends_Output_List := Out_Node;
+                  Last_Output := Out_Node;
+               end;
+            else
+               Log_Compiler_Error (Compiler_Obj, Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index),
+                  "Expected output identifier or '(' in depends clause");
+               raise Program_Error;
+            end if;
+
+            --  Expect '=>'
+            Expect_Token (Compiler_Obj, Arrow_Op_Token);
+
+            --  Parse rhs: void | identifier | (identifier, ...)
+            if Current_Kind = Void_Token then
+               Item_Node.Is_Void_Dep := True;
+               Lexer.Get_Next_Token (Compiler_Obj);  --  Skip 'void'
+            elsif Current_Kind = Left_Parenthesis_Token then
+               Lexer.Get_Next_Token (Compiler_Obj);  --  Skip '('
+               declare
+                  Last_Input : AST_Node_Pointer_Type := null;
+               begin
+                  loop
+                     if Current_Kind /= Identifier_Token then
+                        Log_Compiler_Error (Compiler_Obj, Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index),
+                           "Expected input identifier in depends clause");
+                        raise Program_Error;
+                     end if;
+                     declare
+                        In_Node : constant AST_Node_Pointer_Type :=
+                           Parse_Identifier_List_Item;
+                     begin
+                        if Item_Node.Depends_Input_List = null then
+                           Item_Node.Depends_Input_List := In_Node;
+                        else
+                           Last_Input.Next_Sibling := In_Node;
+                        end if;
+                        Last_Input := In_Node;
+                     end;
+                     exit when Current_Kind /= Comma_Token;
+                     Lexer.Get_Next_Token (Compiler_Obj);  --  Skip ','
+                  end loop;
+               end;
+               Expect_Token (Compiler_Obj, Right_Parenthesis_Token);
+            elsif Current_Kind = Identifier_Token then
+               declare
+                  In_Node : constant AST_Node_Pointer_Type :=
+                     Parse_Identifier_List_Item;
+               begin
+                  Item_Node.Depends_Input_List := In_Node;
+               end;
+            else
+               Log_Compiler_Error (Compiler_Obj, Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index),
+                  "Expected 'void', identifier, or '(' in depends rhs");
+               raise Program_Error;
+            end if;
+
+            --  Link item into contract node
+            if Contract_Node.First_Depends_Item = null then
+               Contract_Node.First_Depends_Item := Item_Node;
+            else
+               Last_Item.Next_Sibling := Item_Node;
+            end if;
+            Last_Item := Item_Node;
+         end;
+
+         exit when Current_Kind /= Comma_Token;
+         Lexer.Get_Next_Token (Compiler_Obj);  --  Skip ',' between items
+      end loop;
+
+      Expect_Token (Compiler_Obj, Right_Parenthesis_Token);  --  Consume ')'
+   end Parse_Depends_Clause;
 
    procedure Parse_Contract_Attribute (Compiler_Obj : in out Compiler_Type;
                                        Contract_Type : out Token_Kind_Type;
@@ -722,7 +1150,7 @@ package body STC_Compiler.Parser is
       end if;
       Lexer.Get_Next_Token (Compiler_Obj);  --  Skip [[
 
-      --  Expect contract type: pre, post, or global
+      --  Expect contract type: pre, post, global, or depends
       case Current_Token_Obj.Kind is
          when Pre_Token | Post_Token =>
             Contract_Type := Current_Token_Obj.Kind;
@@ -791,10 +1219,14 @@ package body STC_Compiler.Parser is
 
             Expect_Token (Compiler_Obj, Right_Parenthesis_Token);
 
+         when Depends_Token =>
+            Contract_Type := Depends_Token;
+            Parse_Depends_Clause (Compiler_Obj, Contract_Node);
+
          when others =>
             Log_Compiler_Error (Compiler_Obj,
                Current_Token_Obj,
-               "Expected contract type (pre, post, or global) in [[...]] attribute");
+               "Expected contract type (pre, post, global, or depends) in [[...]] attribute");
             raise Program_Error;
       end case;
 
@@ -1269,6 +1701,11 @@ package body STC_Compiler.Parser is
          end;
       end loop;
 
+      --  Parse optional generic formal part: generic(...)
+      if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Generic_Token then
+         Parse_Generic_Formal_Part (Compiler_Obj, Compilation_Unit_Node.Generic_Formal_Part);
+      end if;
+
       --  Expect "module <name> {"
       if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /= Module_Token then
          Log_Compiler_Error (Compiler_Obj, "Expected 'module' keyword at start of file");
@@ -1285,6 +1722,9 @@ package body STC_Compiler.Parser is
       Lexer.Get_Next_Token (Compiler_Obj);
 
       --  TODO: Handle dotted names for child modules (module parent.child {)
+
+      --  Parse optional module-level attributes [[abstract_state(...)]] etc.
+      Parse_Module_Attributes (Compiler_Obj, Compilation_Unit_Node);
 
       Expect_Token (Compiler_Obj, Left_Curly_Brace_Token);
 

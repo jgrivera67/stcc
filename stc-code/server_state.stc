@@ -1,0 +1,43 @@
+//
+//  server_state.stc -- Example of abstract_state and refined_state attributes
+//
+//  Demonstrates stC's module-level state abstraction, which maps directly to
+//  SPARK's Abstract_State and Refined_State aspects.
+//
+//  The public interface declares an abstract state name with [[abstract_state]].
+//  Each private variable that contributes to that state is tagged with
+//  [[refined_state(StateName)]].
+//
+//  This allows callers to write global clauses in terms of the abstract name
+//  (e.g., [[global(writes => (State))]]) while the module body works with
+//  concrete variables.
+//
+
+module Server [[abstract_state(State)]] {
+
+   //  Initialize the server buffer and counter
+   void init()
+      [[global(writes => (State))]]
+   {
+   }
+
+   //  Push a byte into the buffer
+   void push(in uint8_t val)
+      [[global(writes => (State))]]
+   {
+   }
+
+   //  Read the current count without modifying state
+   uint32_t count()
+      [[global(reads => (State))]]
+   {
+      return 0;
+   }
+
+   private
+
+   uint8_t buffer[64] [[refined_state(State)]];
+   uint32_t head      [[refined_state(State)]];
+   uint32_t tail      [[refined_state(State)]];
+
+}

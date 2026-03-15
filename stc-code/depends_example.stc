@@ -1,0 +1,58 @@
+//
+//  depends_example.stc -- Examples of [[depends(...)]] contract clauses
+//
+//  Demonstrates stC's information-flow contracts, which map directly to
+//  SPARK's Depends aspect.  The syntax is:
+//
+//    [[depends(output => rhs, ...)]]
+//
+//  where rhs is one of:
+//    void                          -- output is independent of all inputs
+//    identifier                    -- output depends on exactly one input
+//    (identifier, identifier, ...) -- output depends on multiple inputs
+//
+//  To express SPARK's =>+ (output depends on inputs AND its own prior value),
+//  include the output variable in its own input list:
+//    x => (x, y)   (equivalent to SPARK's x =>+ y)
+//
+
+module depends_example {
+
+   //  swap: each output depends on both inputs (classic =>+ scenario)
+   void swap(inout int32_t x, inout int32_t y)
+      [[depends(x => (x, y), y => (x, y))]]
+   {
+      int32_t tmp = x;
+      x = y;
+      y = tmp;
+   }
+
+   //  clear: result is independent of all inputs
+   void clear(out int32_t result)
+      [[depends(result => void)]]
+   {
+      result = 0;
+   }
+
+   //  copy: dst depends solely on src
+   void copy(out int32_t dst, in int32_t src)
+      [[depends(dst => src)]]
+   {
+      dst = src;
+   }
+
+   //  negate: result depends on a single input
+   void negate(in int32_t value, out int32_t result)
+      [[depends(result => value)]]
+   {
+      result = -value;
+   }
+
+   //  scale_add: result depends on three inputs
+   void scale_add(in int32_t a, in int32_t b, in int32_t factor, out int32_t result)
+      [[depends(result => (a, b, factor))]]
+   {
+      result = a * factor + b;
+   }
+
+}
