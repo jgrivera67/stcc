@@ -10,7 +10,18 @@
 \usepackage{textcomp}
 \usepackage{listings}
 \lstset{upquote=true}
-\usepackage{syntax}
+% Grammar listing environment: non-terminals <foo> in italic, terminals "tok" in upright tt
+\lstdefinelanguage{EBNF}{
+  basicstyle=\ttfamily\small,
+  moredelim=[s][\normalfont\itshape]{<}{>},
+  morestring=[b]",
+  stringstyle=\ttfamily,
+  breaklines=true,
+  breakatwhitespace=true,
+}
+\lstnewenvironment{grammar}[1][]
+  {\lstset{language=EBNF, upquote=true, #1}}
+  {}
 \usepackage{float}
 
 %\lstset{basicstyle=\tiny}
@@ -292,7 +303,6 @@ module stdint {
 \chapter{\emph{stC} Grammar}
 
 \begin{grammar}
-%\begin{lstlisting}[numbersep=0pt,resetmargins=true]
 <module> ::=
    (("private")? "import" <module-name> ("as" <module-identifier>)? ";")*
    ("private")? "module" <module-name> "{"
@@ -633,7 +643,6 @@ module stdint {
    "packed" | "at" "(" <constant-expression> ")" |
    "type_invariant" "(" <boolean-expression> ")"
 
-%\end{lstlisting}
 \end{grammar}
 
 \chapter{Examples}
