@@ -1138,19 +1138,40 @@ package body STC_Compiler.Parser is
       Compilation_Unit_Node := new AST_Node_Type (AST_Compilation_Unit_Node);
       Parser_Obj.AST_Root := Compilation_Unit_Node;
 
-      --  Parse import declarations (outside the module body, Ada-style)
-      while Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Import_Token loop
-         Lexer.Get_Next_Token (Compiler_Obj);  --  Skip 'import'
-         --  TODO: Parse import statement
-         Log_Message ("Parsing import (not yet fully implemented)");
-         --  Skip to semicolon
-         while Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /= Semicolon_Token and then
-               Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /= End_Of_File_Token loop
-            Lexer.Get_Next_Token (Compiler_Obj);
-         end loop;
-         if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Semicolon_Token then
-            Lexer.Get_Next_Token (Compiler_Obj);
-         end if;
+      --  Parse import declarations (outside the module body, Ada-style).
+      --  Accepts "import <name>;" and "private import <name>;".
+      --  Stops when neither 'import' nor 'private import' is next
+      --  ('private module' causes 'private' to be consumed, then loop exits
+      --  with current token = 'module').
+      loop
+         declare
+            Is_Private_Import : Boolean := False;
+         begin
+            if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Private_Token then
+               --  Look ahead: "private import" or "private module" (end of imports)
+               Lexer.Get_Next_Token (Compiler_Obj);  --  Consume 'private'
+               exit when
+                  Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /= Import_Token;
+               Is_Private_Import := True;
+            elsif Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /= Import_Token then
+               exit;
+            end if;
+
+            Lexer.Get_Next_Token (Compiler_Obj);  --  Consume 'import'
+            --  TODO: Parse import statement and record Is_Private_Import flag
+            Log_Message ("Parsing " & (if Is_Private_Import then "private " else "") &
+                         "import (not yet fully implemented)");
+            --  Skip to semicolon
+            while Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /= Semicolon_Token
+               and then
+                  Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /= End_Of_File_Token
+            loop
+               Lexer.Get_Next_Token (Compiler_Obj);
+            end loop;
+            if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Semicolon_Token then
+               Lexer.Get_Next_Token (Compiler_Obj);
+            end if;
+         end;
       end loop;
 
       --  Expect "module <name> {"

@@ -88,7 +88,9 @@ types \verb'bool' and \verb'char'.
       In \emph{stC} there is no need for function prototypes or forward declarations.
 \item A module has an explicit name specified at the beginning of the source file with the
       \verb'module' keyword.
-\item A module can import public declarations from other modules, using their names.
+\item A module can import declarations from other modules using their names.
+      An import can be prefixed with \verb'private' (analogous to Ada's \verb'private with'),
+      meaning the imported module is only usable within the current module's private section.
 \item A module can have private declarations that are not visible to other modules.
 \item A module can have child modules. A child module is
       named by using its parent module's name followed by a dot as a prefix.
@@ -292,7 +294,7 @@ module stdint {
 %\begin{grammar}
 \begin{lstlisting}[numbersep=0pt,resetmargins=true]
 <module> ::=
-   ("import" <module-name> ("as" <module-identifier>)? ";")*
+   (("private")? "import" <module-name> ("as" <module-identifier>)? ";")*
    ("private")? "module" <module-name> "{"
    <declaration>*
    ("private" <declaration>+)? "}"
@@ -1498,7 +1500,7 @@ private module geometry.internal {
 
 \begin{lstlisting}
 // File: geometry.circle.stc  (sibling -- allowed to import the private child)
-import geometry.internal;   // OK: sibling within geometry family
+private import geometry.internal;   // private: only used in implementation
 
 module geometry.circle {
 
@@ -1517,6 +1519,34 @@ import geometry.circle;    // OK: public child
 // import geometry.internal;  // ERROR: private child, not accessible here
 
 module app {
+
+}
+\end{lstlisting}
+
+\subsection{Private Imports}
+
+A \verb'private import' restricts an imported module to the private section of the importing
+module.  It is analogous to Ada's \verb'private with' clause and is useful when an import
+is an implementation detail that should not leak into the public interface.
+
+\begin{lstlisting}
+// File: board.stc
+import cpu;                    // public: cpu types appear in the public interface
+private import cpu.multicore;  // private: only used in the implementation
+
+module board {
+
+  const cpu.cpu_model_t cpu_model = cpu.cortex_a72;  // OK: cpu is public
+
+  void start_secondary_cpu(in cpu.secondary_cpu_core_id_t cpu_id,
+                           in cpu.address_t entry_point_address);
+
+  private
+
+  void start_core_impl() {
+    // OK: cpu.multicore is accessible here (private section)
+    cpu.multicore.wake(0);
+  }
 
 }
 \end{lstlisting}
