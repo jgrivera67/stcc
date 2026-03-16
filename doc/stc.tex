@@ -84,36 +84,74 @@ SPARK Ada 2022 \cite{SparkAda} source code that can be formally verified with GN
 The code of \verb'stcc' is available in GitHub at \url{https://github.com/jgrivera67/stcc}.
 
 \section{Language Overview}
+
+\emph{stC} has the Ada/SPARK soul and the C skin.
+It is specifically designed for writing safe embedded software: the language enforces strong typing,
+supports design-by-contract, and transpiles to SPARK Ada so that the full power of GNATprove
+formal verification is available to every \emph{stC} programmer.
+
 \begin{itemize}
-\item \emph{stC} is a fully strong-typed language. That is, There is no automatic integer promotion
+
+\item \emph{stC} is a fully strong-typed language. There is no automatic integer promotion
  or any other implicit type conversions.
+
 \item There are no built-in integer types in \emph{stC}. All integer types must be explicitly declared,
 using language constructs to define range-based or modular-based integer types. The only built-in
-types \verb'bool' and \verb'char'.
+types are \verb'bool' and \verb'char'.
+
+\item Unlike C, \emph{stC} allows the programmer to write completely pointer-free code in general.
+      No explicit pointers are needed for ordinary data structures, and because the language does not
+      support dynamic memory allocation, pointers are not needed for heap management either.
+      Using pointers is the exception, not the norm.
+
+\item \emph{stC} provides programming-by-contract constructs.
+      Contracts --- preconditions (\verb'[[pre]]'), postconditions (\verb'[[post]]'),
+      and type invariants (\verb'[[type_invariant]]') --- are part of the signature of a function
+      or type declaration, not just comments.
+      Because the transpiler emits them as SPARK aspects, they are statically provable by GNATprove.
+
+\item Precise bit-level representation of hardware registers can be specified as part of
+      the corresponding struct declarations, using \verb'[[at]]', \verb'[[offset]]',
+      \verb'[[bits]]', and \verb'[[volatile]]' attributes.
+      This makes safe MMIO register access straightforward, without raw pointer casts or
+      fragile \verb'volatile' structs.
+
 \item Types can be qualified with logical predicates to support ``liquid types''
       (\emph{logically qualified} types).
+
 \item Arrays cannot implicitly be treated as pointers and they carry their length when
-      passed-in as parameters to functions.
+      passed as parameters to functions.
+
 \item There are no header files and no preprocessor.
+
 \item Declarations can be in any order. Symbols can be used before they are declared.
       In \emph{stC} there is no need for function prototypes or forward declarations.
+
 \item A module has an explicit name specified at the beginning of the source file with the
       \verb'module' keyword.
+
 \item A module can import declarations from other modules using their names.
       An import can be prefixed with \verb'private' (analogous to Ada's \verb'private with'),
       meaning the imported module is only usable within the current module's private section.
+
 \item A module can have private declarations that are not visible to other modules.
+
 \item A module can have child modules. A child module is
       named by using its parent module's name followed by a dot as a prefix.
+
 \item A child module inherits all the public and private declarations of its ancestor modules.
       However, inherited private declarations cannot be used in the visible parts of the module's public
       declarations.
+
 \item A child module can be declared \emph{private} by prefixing its \verb'module' declaration with the
       \verb'private' keyword.  A private child module is only accessible to its parent module and to
       sibling modules within the same module family; it cannot be imported by unrelated modules.
       This corresponds to Ada's \emph{private child package} concept.
+
 \item The language is case-sensitive. All reserved words are lower case.
+
 \item The language is block-structured. Blocks are delimited by curly braces.
+
 \end{itemize}
 
 \section{stcc}
