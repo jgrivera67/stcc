@@ -75,7 +75,7 @@
         },
         {
           "name": "keyword.other.stc",
-          "match": "\\b(module|import|type|subtype|const|foreign|private|packed|volatile|static|auto|sizeof)\\b"
+          "match": "\\b(module|import|generic|type|subtype|const|foreign|private|packed|volatile|static|auto|sizeof)\\b"
         },
         {
           "name": "keyword.type.stc",
@@ -87,7 +87,7 @@
         },
         {
           "name": "keyword.contract.stc",
-          "match": "\\b(pre|post|global|reads|writes|loop_invariant|loop_variant|type_invariant|assert)\\b"
+          "match": "\\b(pre|post|global|reads|writes|depends|abstract_state|refined_state|loop_invariant|loop_variant|type_invariant|assert)\\b"
         },
         {
           "name": "keyword.attribute.hardware.stc",
