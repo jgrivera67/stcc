@@ -1,2 +1,2 @@
 # stcc
-Strong-Typed C Compiler
+Strongly-Typed C Compiler

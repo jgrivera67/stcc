@@ -1,7 +1,7 @@
 {
   "name": "stc-language",
   "displayName": "stC Language Support",
-  "description": "Language support for Strong-Typed C (stC)",
+  "description": "Language support for stC: The Strongly-Typed C programming language",
   "version": "0.1.0",
   "publisher": "stc-lang",
   "engines": {
@@ -12,7 +12,7 @@
   ],
   "keywords": [
     "stC",
-    "Strong-Typed C",
+    "Strongly-Typed C",
     "systems programming"
   ],
   "main": "./client/out/extension.js",
@@ -22,7 +22,7 @@
         "id": "stc",
         "aliases": [
           "stC",
-          "Strong-Typed C"
+          "Strongly-Typed C"
         ],
         "extensions": [
           ".stc"

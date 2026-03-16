@@ -1,6 +1,6 @@
 # stC Language Support for VSCode
 
-Language support for Strong-Typed C (stC) programming language.
+Language support for stC: The Strongly-Typed C programming language.
 
 ## Features
 
@@ -79,7 +79,7 @@ Then install the generated `.vsix` file in VSCode.
 
 ## stC Language Overview
 
-stC (Strong-Typed C) is a systems programming language with:
+stC: The Strongly-Typed C programming language, with:
 
 - **Type Safety**: Range types and modular types with compile-time checking
 - **Subtypes**: Ada-style subtypes for semantic type constraints

@@ -6,7 +6,7 @@
 --
 
 --
---  @summary Strong-Typed C compiler
+--  @summary Strongly-Typed C compiler
 --
 with STC_Compiler.Lexer;
 with STC_Compiler.Parser;

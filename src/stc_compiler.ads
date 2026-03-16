@@ -6,7 +6,7 @@
 --
 
 --
---  @summary Strong-Typed C compiler
+--  @summary Strongly-Typed C compiler
 --
 private with Ada.Text_IO;
 private with Ada.Containers.Indefinite_Ordered_Maps;

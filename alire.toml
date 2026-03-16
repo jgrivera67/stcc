@@ -1,5 +1,5 @@
 name = "stcc"
-description = "Strong-Typed C Compiler"
+description = "Strongly-Typed C Compiler"
 version = "0.1.0-dev"
 
 authors = ["J. German Rivera"]

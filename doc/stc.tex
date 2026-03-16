@@ -44,7 +44,7 @@
    \centering
    \vspace*{2cm}
    \includegraphics[width=0.5\textwidth]{logo/stc-logo-final.jpg}\\[1.5cm]
-   {\Huge\bfseries The \emph{Strong-Typed C (stC)}\\[0.4cm]
+   {\Huge\bfseries \emph{stC}: The Strongly-Typed C\\[0.4cm]
     Programming Language\par}
    \vspace{1.5cm}
    {\Large Germ\'an Rivera\par}
@@ -61,7 +61,7 @@
 \mainmatter
 \raggedbottom
 \pagestyle{myheadings}
-\markboth{stC: Strong-Typed C Language}{stC: Strong-Typed C Language}
+\markboth{stC: Strongly-Typed C Language}{stC: Strongly-Typed C Language}
 
 \chapter{Introduction}
 
@@ -72,10 +72,10 @@ verbosity, or perhaps simply because Ada does not look more like C.
 
 What if we could have a new programming language for embedded software that looks
 like C but has an Ada soul, that is, a language with all the Ada concepts but
-in a C skin, C with a strong-typed armor, and where using pointers is more
+in a C skin, C with a strongly-typed armor, and where using pointers is more
 the exception than the norm.
 
-This document presents the \emph{stC} (\emph{``Strong-Typed C''} programming language)
+This document presents \emph{stC} (\emph{Strongly-Typed C}), a programming language
 for safety-critical embedded software development.
 
 A proof-of-concept compiler for \emph{stC}, known as \verb'stcc', has been written
@@ -93,7 +93,7 @@ so that the full power of GNATprove formal verification is available to every \e
 
 \begin{itemize}
 
-\item \emph{stC} is a fully strong-typed language. There is no automatic integer promotion
+\item \emph{stC} is a fully strongly-typed language. There is no automatic integer promotion
  or any other implicit type conversions.
 
 \item There are no built-in integer types in \emph{stC}. All integer types must be explicitly declared,
