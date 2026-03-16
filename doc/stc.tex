@@ -43,7 +43,7 @@
 \begin{titlepage}
    \centering
    \vspace*{2cm}
-   \includegraphics[width=0.45\textwidth]{logo/stc-logo-v7.jpg}\\[1.5cm]
+   \includegraphics[width=0.5\textwidth]{logo/stc-logo-final.jpg}\\[1.5cm]
    {\Huge\bfseries The \emph{Strong-Typed C (stC)}\\[0.4cm]
     Programming Language\par}
    \vspace{1.5cm}
@@ -299,389 +299,6 @@ module stdint {
   type modular 1 << machine_width address_t;
 }
 \end{lstlisting}
-
-\chapter{\emph{stC} Grammar}
-
-\begin{grammar}
-<module> ::=
-   (("private")? "import" <module-name> (<generic-actual-part>)?
-      ("as" <module-identifier>)? ";")*
-   (<generic-formal-part>)?
-   ("private")? "module" <module-name> (<module-attributes>)? "{"
-   <declaration>*
-   ("private" <declaration>+)? "}"
-
-<generic-formal-part> ::=
-   "generic" "(" <generic-formal-parameter> ("," <generic-formal-parameter>)* ")"
-
-<generic-formal-parameter> ::=
-   "type" <type-identifier> |
-   "const" <type-identifier> <constant-identifier> |
-   <type-identifier> <function-identifier>
-      "(" (<param-declaration> ("," <param-declaration>)*)? ")"
-
-<function-identifier> ::= "<identifier>"
-
-<generic-actual-part> ::=
-   "(" <generic-actual-parameter> ("," <generic-actual-parameter>)* ")"
-
-<generic-actual-parameter> ::=
-   "<identifier>" "=>" ("<identifier>" | <constant-expression>)
-
-<module-attributes> ::= ("[[" <module-attribute> "]]")+
-
-<module-attribute> ::=
-   "abstract_state" "(" <identifier> ("," <identifier>)* ")"
-
-<module-name> ::= "<identifier>" ("." "<identifier>")*
-
-<module-identifier> ::= "<identifier>"
-
-<declaration> ::=
-   <constant-declaration> |
-   <type-declaration> |
-   <function-sig-type-declaration> |
-   <subtype-declaration> |
-   <global-variable-declaration> |
-   <function-declaration> |
-   <foreign-variable-declaration> |
-   <foreign-function-declaration> |
-   <compile-if-declaration>
-
-<constant-declaration> ::=
-   "const" <type-identifier> <constant-declarator> "=" <constant-expression> ";" |
-   "const" "type" <type-declarator> <type-identifier> <constant-identifier>
-      "=" <constant-expression> ";"
-
-<constant-declarator> ::=
-   ("*")? <constant-identifier>
-             ("[" "]" ("[" <constant-integer-expression> "]")* |
-              "[" <constant-integer-expression> "]")*
-
-<constant-identifier> ::= "<identifier>"
-
-<type-declaration> ::=
-   "type" <type-declarator> <type-identifier> (<type-attributes>)? ";"
-
-<function-sig-type-declaration> ::=
-   "type" (<return-type-identifier> | "void") <type-identifier>
-   "(" (<param-declaration> ("," <param-declaration>)*)? ")" ";"
-
-<return-type-identifier> ::= <type-identifier>
-
-<subtype-declaration> ::=
-   "subtype" <type-identifier> "range" <constant-integer-expression>
-      ".." <constant-integer-expression> <subtype-identifier>
-      (<type-attributes>)? ";"
-
-<type-identifier> ::= "<identifier>" ("." "<identifier>")*
-
-<subtype-identifier> ::= "<identifier>"
-
-<type-declarator> ::=
-   "range" <constant-integer-expression> ".." <constant-integer-expression> |
-   "modular" <constant-integer-expression> |
-   "float" "digits" <constant-integer-expression>
-      ("range" <constant-expression> ".." <constant-expression>)? |
-   "fixed" "delta" <constant-expression> "range"
-      <constant-expression> ".." <constant-expression> |
-   "decimal" "delta" <constant-expression> "digits" <constant-integer-expression> |
-   ("struct" | "union") "{" (<struct-field-declaration> ";")+ "}" |
-   "enum" "{" <enum-entry> ("," <enum-entry>)* "}"
-
-<struct-field-declaration> ::=
-   <type-identifier> <struct-field-declarator>
-      (<field-attributes>)? ("=" <constant-expression>)?
-
-<struct-field-declarator> ::=
-   ("*")? <struct-field-identifier>
-            ("[" <constant-integer-expression> "]")*
-
-<struct-field-identifier> ::= "<identifier>"
-
-<field-attributes> ::=
-   ("[[" <field-attribute> "]]")+
-
-<field-attribute> ::=
-   "offset" "(" <constant-integer-expression> ")"
-      ("bit" "(" <constant-integer-expression> ")" |
-       "bits" "(" <constant-integer-expression> ".." <constant-integer-expression> ")") |
-   "volatile"
-
-<enum-entry> ::=
-   <enum-entry-identifier> ("=" <constant-integer-expression>)?
-
-<enum-entry-identifier> ::= "<identifier>"
-
-<global-variable-declaration> ::=
-   ("const" | "volatile")? <type-identifier> <global-variable-declarator>
-   ("=" <constant-expression>)? (<variable-attributes>)? ";"
-
-<global-variable-declarator> ::=
-   ("*")? <global-variable-identifier>
-            ("[" <constant-integer-expression> "]")*
-
-<global-variable-identifier> ::= "<identifier>"
-
-<function-declaration> ::=
-   ("void" | <type-identifier> ("*")?) <function-identifier>
-       "(" (<param-declaration> ("," <param-declaration>)*)? ")"
-       (<function-attributes>)?
-       <statement-block>
-
-<function-identifier> ::= "<identifier>"
-
-<statement-block> ::=
-      "{" (<local-variable-declaration> | <statement>)* "}"
-
-<local-variable-declaration> ::=
-   ("volatile")? <type-identifier> <local-variable-declarator>
-   ("=" <expression>)? (<variable-attributes>)? ";"
-
-<local-variable-declarator> ::=
-   ("*")? <local-variable-identifier> ("[" <index-expression> "]")*
-
-<local-variable-identifier> ::= "<identifier>"
-
-<statement> ::=
-    <assignment> |
-    <void-function-call> |
-    <if-statement> |
-    <while-statement> |
-    <for-statement> |
-    <do-while-statement> |
-    <switch-statement> |
-    <statement-block> |
-    <return-statement> |
-    <compile-if-statement>
-
-<assignment> ::= <variable-reference> "=" <expression>
-
-<void-function-call> ::= <void-function-reference>  "(" (<function-call-argument> ("," <function-call-argument>)*)? ")"
-
-<void-function-reference> ::=
-  <void-function-identifier> |
-  <void-function-pointer-expression>
-
-<if-statement> ::= "if" "(" <boolean-expression> ")" <statement-block> ("else" <statement-block>)?
-
-<while-statement> ::= "while" "(" <boolean-expression> ")" (<loop-attributes>)? <statement-block>
-
-<do-while-statement> ::= "do" <statement-block> "while" "(" <boolean-expression> ")" ";"
-
-<for-statement> ::=
-   "for" "(" (<local-variable-declaration> | <assignment>)? ";"
-   <boolean-expression>? ";"
-   <assignment>? ")" (<loop-attributes>)? <statement-block> |
-   "for" "(" <type-identifier> <local-variable-identifier> "in" <expression> ")"
-   (<loop-attributes>)? <statement-block>
-
-<switch-statement> ::=
-   "switch" "(" <expression> ")" "{"
-   <switch-case>*
-   (<default-case>)?
-   "}"
-
-<switch-case> ::= "case" <constant-expression> ":" <statement>*
-
-<default-case> ::= "default" ":" <statement>*
-
-<return-statement> ::= "return" (<expression>)? ";"
-
-<compile-if-statement> ::=
-   "compile_if" <constant-expression> "{"
-      <statement>*
-   "}" ("else" "{" <statement>* "}")?
-
-<compile-if-declaration> ::=
-   "compile_if" <constant-expression> "{"
-      <declaration>*
-   "}" ("else" "{" <declaration>* "}")?
-
-<param-declaration> ::=
-   (<parameter-mode>)? <type-identifier> <param-declarator>
-
-<parameter-mode> ::= "in" | "out" | "inout"
-
-<param-declarator> ::=
-   ("*")? <param-identifier> ("[" "]" ("[" <constant-integer-expression> "]")*)?
-
-<param-identifier> ::= "<identifier>"
-
-<function-call-argument> ::= <expression>
-
-<foreign-variable-declaration> ::=
-   "foreign" "convention" "(" <string-literal> ")"
-   <type-identifier> <global-variable-declarator> ";"
-
-<foreign-function-declaration> ::=
-   "foreign" "convention" "(" <string-literal> ")"
-   ("void" | <type-identifier> ("*")?) <function-identifier>
-   "(" (<param-declaration> ("," <param-declaration>)*)? ")" ";"
-
-<expression> ::= <ternary-expression>
-
-<ternary-expression> ::=
-   <logical-or-expression> ("?" <expression> ":" <expression>)?
-
-<logical-or-expression> ::=
-   <logical-and-expression> ("||" <logical-and-expression>)*
-
-<logical-and-expression> ::=
-   <bitwise-or-expression> ("&&" <bitwise-or-expression>)*
-
-<bitwise-or-expression> ::=
-   <bitwise-xor-expression> ("|" <bitwise-xor-expression>)*
-
-<bitwise-xor-expression> ::=
-   <bitwise-and-expression> ("^" <bitwise-and-expression>)*
-
-<bitwise-and-expression> ::=
-   <equality-expression> ("&" <equality-expression>)*
-
-<equality-expression> ::=
-   <relational-expression> (("==" | "!=" | "in") <relational-expression>)*
-
-<relational-expression> ::=
-   <shift-expression> (("<" | ">" | "<=" | ">=" | "..") <shift-expression>)*
-
-<shift-expression> ::=
-   <additive-expression> (("<<" | ">>") <additive-expression>)*
-
-<additive-expression> ::=
-   <multiplicative-expression> (("+" | "-") <multiplicative-expression>)*
-
-<multiplicative-expression> ::=
-   <power-expression> (("*" | "/" | "%") <power-expression>)*
-
-<power-expression> ::=
-   <unary-expression> ("**" <unary-expression>)*
-
-<unary-expression> ::=
-   <postfix-expression> |
-   <unary-operator> <unary-expression> |
-   "sizeof" "(" (<type-identifier> | <expression>) ")"
-
-<unary-operator> ::= "+" | "-" | "!" | "~" | "*" | "&"
-
-<postfix-expression> ::=
-   <primary-expression>
-      (("[" <expression> "]") |
-       ("(" (<function-call-argument> ("," <function-call-argument>)*)? ")") |
-       ("." <struct-field-identifier>) |
-       ("->" <struct-field-identifier>) |
-       ("'" <identifier-attribute>))*
-
-<identifier-attribute> ::= "first" | "last" | "length" | "range" | "size"
-
-<primary-expression> ::=
-   <identifier> |
-   <literal> |
-   "(" <expression> ")" |
-   <type-cast-expression> |
-   "{" <expression> ("," <expression>)* "}"
-
-<type-cast-expression> ::= <type-identifier> "(" <expression> ")"
-
-<boolean-expression> ::= <expression>
-
-<index-expression> ::= <expression>
-
-<constant-expression> ::= <expression>
-
-<constant-integer-expression> ::=
-   "<binary-integer-literal>" |
-   "<decimal-integer-literal>" |
-   "<hexadecimal-integer-literal>" |
-   <constant-identifier> |
-   <integer-unary-op> <constant-integer-expression> |
-   <constant-integer-expression> <integer-binary-op>
-      <constant-integer-expression>
-
-<integer-unary-op> ::= "+" | "-" | "~"
-
-<integer-binary-op> ::=
-   "+" | "-" | "*" | "/" | "%" | "**" | "<<" | ">>" |
-   "&" | "|" | "^"
-
-<literal> ::=
-   "<binary-integer-literal>" |
-   "<decimal-integer-literal>" |
-   "<hexadecimal-integer-literal>" |
-   "<floating-point-literal>" |
-   "<character-literal>" |
-   "<string-literal>" |
-   "<boolean-literal>"
-
-<boolean-literal> ::= "true" | "false"
-
-<variable-reference> ::=
-  <variable-identifier> ("." <struct-field-identifier> ("[" <index-expression> "]")*)* |
-  <variable-identifier> ("[" <index-expression> "]")*
-
-<variable-identifier> ::= "<identifier>"
-
-<void-function-identifier> ::= "<identifier>"
-
-<variable-attributes> ::=
-   ("[[" <variable-attribute> "]]")+
-
-<variable-attribute> ::=
-   "at" "(" <constant-expression> ")" |
-   "refined_state" "(" "<identifier>" ")"
-
-<function-attributes> ::=
-   <function-attribute>+
-
-<function-attribute> ::=
-   "[[" (<function-contract> | "no_return") "]]"
-
-<function-contract> ::=
-   <precondition> | <postcondition> | <global-clause> | <depends-clause>
-
-<depends-clause> ::=
-   "depends" "(" <depends-item> ("," <depends-item>)* ")"
-
-<depends-item> ::=
-   <depends-output> "=>" <depends-rhs>
-
-<depends-output> ::=
-   "<identifier>" | "(" "<identifier>" ("," "<identifier>")* ")"
-
-<depends-rhs> ::=
-   "void" | "<identifier>" | "(" "<identifier>" ("," "<identifier>")* ")"
-
-<precondition> ::= "pre" "(" <boolean-expression> ")"
-
-<postcondition> ::= "post" "(" <boolean-expression> ")"
-
-<global-clause> ::=
-   "global" "(" <global-effect> ("," <global-effect>)* ")"
-
-<global-effect> ::=
-   ("reads" | "writes") "=>" "(" <identifier> ("," <identifier>)* ")"
-
-<loop-attributes> ::=
-   <loop-attribute>+
-
-<loop-attribute> ::=
-   "[[" <loop-contract> "]]"
-
-<loop-contract> ::=
-   <loop-invariant> | <loop-variant>
-
-<loop-invariant> ::= "loop_invariant" "(" <boolean-expression> ")"
-
-<loop-variant> ::= "loop_variant" "(" <expression> ")"
-
-<type-attributes> ::=
-   ("[[" <type-attribute> "]]")+
-
-<type-attribute> ::=
-   "packed" | "at" "(" <constant-expression> ")" |
-   "type_invariant" "(" <boolean-expression> ")"
-
-\end{grammar}
 
 \chapter{Examples}
 
@@ -1765,6 +1382,389 @@ Instantiate as:
 \begin{lstlisting}
 import Fixed_Queue(T => uint8_t, Capacity => 64) as Byte_Queue;
 \end{lstlisting}
+
+\appendix
+
+\chapter{\emph{stC} Grammar}
+
+\begin{grammar}
+<module> ::=
+   (("private")? "import" <module-name> (<generic-actual-part>)?
+      ("as" <module-identifier>)? ";")*
+   (<generic-formal-part>)?
+   ("private")? "module" <module-name> (<module-attributes>)? "{"
+   <declaration>*
+   ("private" <declaration>+)? "}"
+
+<generic-formal-part> ::=
+   "generic" "(" <generic-formal-parameter> ("," <generic-formal-parameter>)* ")"
+
+<generic-formal-parameter> ::=
+   "type" <type-identifier> |
+   "const" <type-identifier> <constant-identifier> |
+   <type-identifier> <function-identifier>
+      "(" (<param-declaration> ("," <param-declaration>)*)? ")"
+
+<function-identifier> ::= "<identifier>"
+
+<generic-actual-part> ::=
+   "(" <generic-actual-parameter> ("," <generic-actual-parameter>)* ")"
+
+<generic-actual-parameter> ::=
+   "<identifier>" "=>" ("<identifier>" | <constant-expression>)
+
+<module-attributes> ::= ("[[" <module-attribute> "]]")+
+
+<module-attribute> ::=
+   "abstract_state" "(" <identifier> ("," <identifier>)* ")"
+
+<module-name> ::= "<identifier>" ("." "<identifier>")*
+
+<module-identifier> ::= "<identifier>"
+
+<declaration> ::=
+   <constant-declaration> |
+   <type-declaration> |
+   <function-sig-type-declaration> |
+   <subtype-declaration> |
+   <global-variable-declaration> |
+   <function-declaration> |
+   <foreign-variable-declaration> |
+   <foreign-function-declaration> |
+   <compile-if-declaration>
+
+<constant-declaration> ::=
+   "const" <type-identifier> <constant-declarator> "=" <constant-expression> ";" |
+   "const" "type" <type-declarator> <type-identifier> <constant-identifier>
+      "=" <constant-expression> ";"
+
+<constant-declarator> ::=
+   ("*")? <constant-identifier>
+             ("[" "]" ("[" <constant-integer-expression> "]")* |
+              "[" <constant-integer-expression> "]")*
+
+<constant-identifier> ::= "<identifier>"
+
+<type-declaration> ::=
+   "type" <type-declarator> <type-identifier> (<type-attributes>)? ";"
+
+<function-sig-type-declaration> ::=
+   "type" (<return-type-identifier> | "void") <type-identifier>
+   "(" (<param-declaration> ("," <param-declaration>)*)? ")" ";"
+
+<return-type-identifier> ::= <type-identifier>
+
+<subtype-declaration> ::=
+   "subtype" <type-identifier> "range" <constant-integer-expression>
+      ".." <constant-integer-expression> <subtype-identifier>
+      (<type-attributes>)? ";"
+
+<type-identifier> ::= "<identifier>" ("." "<identifier>")*
+
+<subtype-identifier> ::= "<identifier>"
+
+<type-declarator> ::=
+   "range" <constant-integer-expression> ".." <constant-integer-expression> |
+   "modular" <constant-integer-expression> |
+   "float" "digits" <constant-integer-expression>
+      ("range" <constant-expression> ".." <constant-expression>)? |
+   "fixed" "delta" <constant-expression> "range"
+      <constant-expression> ".." <constant-expression> |
+   "decimal" "delta" <constant-expression> "digits" <constant-integer-expression> |
+   ("struct" | "union") "{" (<struct-field-declaration> ";")+ "}" |
+   "enum" "{" <enum-entry> ("," <enum-entry>)* "}"
+
+<struct-field-declaration> ::=
+   <type-identifier> <struct-field-declarator>
+      (<field-attributes>)? ("=" <constant-expression>)?
+
+<struct-field-declarator> ::=
+   ("*")? <struct-field-identifier>
+            ("[" <constant-integer-expression> "]")*
+
+<struct-field-identifier> ::= "<identifier>"
+
+<field-attributes> ::=
+   ("[[" <field-attribute> "]]")+
+
+<field-attribute> ::=
+   "offset" "(" <constant-integer-expression> ")"
+      ("bit" "(" <constant-integer-expression> ")" |
+       "bits" "(" <constant-integer-expression> ".." <constant-integer-expression> ")") |
+   "volatile"
+
+<enum-entry> ::=
+   <enum-entry-identifier> ("=" <constant-integer-expression>)?
+
+<enum-entry-identifier> ::= "<identifier>"
+
+<global-variable-declaration> ::=
+   ("const" | "volatile")? <type-identifier> <global-variable-declarator>
+   ("=" <constant-expression>)? (<variable-attributes>)? ";"
+
+<global-variable-declarator> ::=
+   ("*")? <global-variable-identifier>
+            ("[" <constant-integer-expression> "]")*
+
+<global-variable-identifier> ::= "<identifier>"
+
+<function-declaration> ::=
+   ("void" | <type-identifier> ("*")?) <function-identifier>
+       "(" (<param-declaration> ("," <param-declaration>)*)? ")"
+       (<function-attributes>)?
+       <statement-block>
+
+<statement-block> ::=
+      "{" (<local-variable-declaration> | <statement>)* "}"
+
+<local-variable-declaration> ::=
+   ("volatile")? <type-identifier> <local-variable-declarator>
+   ("=" <expression>)? (<variable-attributes>)? ";"
+
+<local-variable-declarator> ::=
+   ("*")? <local-variable-identifier> ("[" <index-expression> "]")*
+
+<local-variable-identifier> ::= "<identifier>"
+
+<statement> ::=
+    <assignment> |
+    <void-function-call> |
+    <if-statement> |
+    <while-statement> |
+    <for-statement> |
+    <do-while-statement> |
+    <switch-statement> |
+    <statement-block> |
+    <return-statement> |
+    <compile-if-statement>
+
+<assignment> ::= <variable-reference> "=" <expression>
+
+<void-function-call> ::= <void-function-reference>  "(" (<function-call-argument> ("," <function-call-argument>)*)? ")"
+
+<void-function-reference> ::=
+  <void-function-identifier> |
+  <void-function-pointer-expression>
+
+<if-statement> ::= "if" "(" <boolean-expression> ")" <statement-block> ("else" <statement-block>)?
+
+<while-statement> ::= "while" "(" <boolean-expression> ")" (<loop-attributes>)? <statement-block>
+
+<do-while-statement> ::= "do" <statement-block> "while" "(" <boolean-expression> ")" ";"
+
+<for-statement> ::=
+   "for" "(" (<local-variable-declaration> | <assignment>)? ";"
+   <boolean-expression>? ";"
+   <assignment>? ")" (<loop-attributes>)? <statement-block> |
+   "for" "(" <type-identifier> <local-variable-identifier> "in" <expression> ")"
+   (<loop-attributes>)? <statement-block>
+
+<switch-statement> ::=
+   "switch" "(" <expression> ")" "{"
+   <switch-case>*
+   (<default-case>)?
+   "}"
+
+<switch-case> ::= "case" <constant-expression> ":" <statement>*
+
+<default-case> ::= "default" ":" <statement>*
+
+<return-statement> ::= "return" (<expression>)? ";"
+
+<compile-if-statement> ::=
+   "compile_if" <constant-expression> "{"
+      <statement>*
+   "}" ("else" "{" <statement>* "}")?
+
+<compile-if-declaration> ::=
+   "compile_if" <constant-expression> "{"
+      <declaration>*
+   "}" ("else" "{" <declaration>* "}")?
+
+<param-declaration> ::=
+   (<parameter-mode>)? <type-identifier> <param-declarator>
+
+<parameter-mode> ::= "in" | "out" | "inout"
+
+<param-declarator> ::=
+   ("*")? <param-identifier> ("[" "]" ("[" <constant-integer-expression> "]")*)?
+
+<param-identifier> ::= "<identifier>"
+
+<function-call-argument> ::= <expression>
+
+<foreign-variable-declaration> ::=
+   "foreign" "convention" "(" <string-literal> ")"
+   <type-identifier> <global-variable-declarator> ";"
+
+<foreign-function-declaration> ::=
+   "foreign" "convention" "(" <string-literal> ")"
+   ("void" | <type-identifier> ("*")?) <function-identifier>
+   "(" (<param-declaration> ("," <param-declaration>)*)? ")" ";"
+
+<expression> ::= <ternary-expression>
+
+<ternary-expression> ::=
+   <logical-or-expression> ("?" <expression> ":" <expression>)?
+
+<logical-or-expression> ::=
+   <logical-and-expression> ("||" <logical-and-expression>)*
+
+<logical-and-expression> ::=
+   <bitwise-or-expression> ("&&" <bitwise-or-expression>)*
+
+<bitwise-or-expression> ::=
+   <bitwise-xor-expression> ("|" <bitwise-xor-expression>)*
+
+<bitwise-xor-expression> ::=
+   <bitwise-and-expression> ("^" <bitwise-and-expression>)*
+
+<bitwise-and-expression> ::=
+   <equality-expression> ("&" <equality-expression>)*
+
+<equality-expression> ::=
+   <relational-expression> (("==" | "!=" | "in") <relational-expression>)*
+
+<relational-expression> ::=
+   <shift-expression> (("<" | ">" | "<=" | ">=" | "..") <shift-expression>)*
+
+<shift-expression> ::=
+   <additive-expression> (("<<" | ">>") <additive-expression>)*
+
+<additive-expression> ::=
+   <multiplicative-expression> (("+" | "-") <multiplicative-expression>)*
+
+<multiplicative-expression> ::=
+   <power-expression> (("*" | "/" | "%") <power-expression>)*
+
+<power-expression> ::=
+   <unary-expression> ("**" <unary-expression>)*
+
+<unary-expression> ::=
+   <postfix-expression> |
+   <unary-operator> <unary-expression> |
+   "sizeof" "(" (<type-identifier> | <expression>) ")"
+
+<unary-operator> ::= "+" | "-" | "!" | "~" | "*" | "&"
+
+<postfix-expression> ::=
+   <primary-expression>
+      (("[" <expression> "]") |
+       ("(" (<function-call-argument> ("," <function-call-argument>)*)? ")") |
+       ("." <struct-field-identifier>) |
+       ("->" <struct-field-identifier>) |
+       ("'" <identifier-attribute>))*
+
+<identifier-attribute> ::= "first" | "last" | "length" | "range" | "size"
+
+<primary-expression> ::=
+   <identifier> |
+   <literal> |
+   "(" <expression> ")" |
+   <type-cast-expression> |
+   "{" <expression> ("," <expression>)* "}"
+
+<type-cast-expression> ::= <type-identifier> "(" <expression> ")"
+
+<boolean-expression> ::= <expression>
+
+<index-expression> ::= <expression>
+
+<constant-expression> ::= <expression>
+
+<constant-integer-expression> ::=
+   "<binary-integer-literal>" |
+   "<decimal-integer-literal>" |
+   "<hexadecimal-integer-literal>" |
+   <constant-identifier> |
+   <integer-unary-op> <constant-integer-expression> |
+   <constant-integer-expression> <integer-binary-op>
+      <constant-integer-expression>
+
+<integer-unary-op> ::= "+" | "-" | "~"
+
+<integer-binary-op> ::=
+   "+" | "-" | "*" | "/" | "%" | "**" | "<<" | ">>" |
+   "&" | "|" | "^"
+
+<literal> ::=
+   "<binary-integer-literal>" |
+   "<decimal-integer-literal>" |
+   "<hexadecimal-integer-literal>" |
+   "<floating-point-literal>" |
+   "<character-literal>" |
+   "<string-literal>" |
+   "<boolean-literal>"
+
+<boolean-literal> ::= "true" | "false"
+
+<variable-reference> ::=
+  <variable-identifier> ("." <struct-field-identifier> ("[" <index-expression> "]")*)* |
+  <variable-identifier> ("[" <index-expression> "]")*
+
+<variable-identifier> ::= "<identifier>"
+
+<void-function-identifier> ::= "<identifier>"
+
+<variable-attributes> ::=
+   ("[[" <variable-attribute> "]]")+
+
+<variable-attribute> ::=
+   "at" "(" <constant-expression> ")" |
+   "refined_state" "(" "<identifier>" ")"
+
+<function-attributes> ::=
+   <function-attribute>+
+
+<function-attribute> ::=
+   "[[" (<function-contract> | "no_return") "]]"
+
+<function-contract> ::=
+   <precondition> | <postcondition> | <global-clause> | <depends-clause>
+
+<depends-clause> ::=
+   "depends" "(" <depends-item> ("," <depends-item>)* ")"
+
+<depends-item> ::=
+   <depends-output> "=>" <depends-rhs>
+
+<depends-output> ::=
+   "<identifier>" | "(" "<identifier>" ("," "<identifier>")* ")"
+
+<depends-rhs> ::=
+   "void" | "<identifier>" | "(" "<identifier>" ("," "<identifier>")* ")"
+
+<precondition> ::= "pre" "(" <boolean-expression> ")"
+
+<postcondition> ::= "post" "(" <boolean-expression> ")"
+
+<global-clause> ::=
+   "global" "(" <global-effect> ("," <global-effect>)* ")"
+
+<global-effect> ::=
+   ("reads" | "writes") "=>" "(" <identifier> ("," <identifier>)* ")"
+
+<loop-attributes> ::=
+   <loop-attribute>+
+
+<loop-attribute> ::=
+   "[[" <loop-contract> "]]"
+
+<loop-contract> ::=
+   <loop-invariant> | <loop-variant>
+
+<loop-invariant> ::= "loop_invariant" "(" <boolean-expression> ")"
+
+<loop-variant> ::= "loop_variant" "(" <expression> ")"
+
+<type-attributes> ::=
+   ("[[" <type-attribute> "]]")+
+
+<type-attribute> ::=
+   "packed" | "at" "(" <constant-expression> ")" |
+   "type_invariant" "(" <boolean-expression> ")"
+
+\end{grammar}
 
 \begin{thebibliography}{9}
 
