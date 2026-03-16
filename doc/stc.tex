@@ -105,10 +105,17 @@ types are \verb'bool' and \verb'char'.
       Using pointers is the exception, not the norm.
 
 \item \emph{stC} provides programming-by-contract constructs.
-      Contracts --- preconditions (\verb'[[pre]]'), postconditions (\verb'[[post]]'),
+      Function contracts --- preconditions (\verb'[[pre]]'), postconditions (\verb'[[post]]'),
       and type invariants (\verb'[[type_invariant]]') --- are part of the signature of a function
       or type declaration, not just comments.
-      Because the transpiler emits them as SPARK aspects, they are statically provable by GNATprove.
+      Loop contracts --- loop invariants (\verb'[[loop_invariant]]') and loop variants
+      (\verb'[[loop_variant]]') --- can be attached to any loop to prove termination and
+      absence of runtime errors within the loop body.
+      Data-flow contracts --- global variable clauses (\verb'[[global]]') and information-flow
+      dependencies (\verb'[[depends]]') --- precisely capture which state a function reads or
+      writes and how each output depends on the inputs.
+      Because the transpiler emits all contracts as SPARK aspects, they are statically provable
+      by GNATprove.
 
 \item Precise bit-level representation of hardware registers can be specified as part of
       the corresponding struct declarations, using \verb'[[at]]', \verb'[[offset]]',
