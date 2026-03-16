@@ -170,6 +170,9 @@ package body STC_Compiler.Parser is
                                         Formal_Part_Node : out AST_Node_Pointer_Type);
    pragma Warnings (On, "procedure ""Parse_Generic_Formal_Part"" is not referenced");
 
+   procedure Parse_Loop_Contracts (Compiler_Obj   : in out Compiler_Type;
+                                   First_Contract : out AST_Node_Pointer_Type);
+
    procedure Expect_Token (Compiler_Obj : in out Compiler_Type;
                           Expected : Token_Kind_Type) is
       Parser_Obj : Parser_Type renames Compiler_Obj.Parser_Obj;
@@ -186,6 +189,47 @@ package body STC_Compiler.Parser is
       end if;
       Lexer.Get_Next_Token (Compiler_Obj);
    end Expect_Token;
+
+   --  Parse zero or more [[loop_invariant(expr)]] / [[loop_variant(expr)]] annotations.
+   --  Called after the loop header's closing ')' and before the statement block.
+   procedure Parse_Loop_Contracts (Compiler_Obj   : in out Compiler_Type;
+                                   First_Contract : out AST_Node_Pointer_Type) is
+      Parser_Obj    : Parser_Type renames Compiler_Obj.Parser_Obj;
+      Last_Contract : AST_Node_Pointer_Type := null;
+      Contract_Node : AST_Node_Pointer_Type;
+
+      function Current_Kind return Token_Kind_Type is
+        (Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind);
+   begin
+      First_Contract := null;
+      while Current_Kind = Left_Double_Square_Parenthesis_Token loop
+         Lexer.Get_Next_Token (Compiler_Obj);  --  Skip [[
+         Contract_Node := new AST_Node_Type (AST_Loop_Contract_Node);
+         case Current_Kind is
+            when Loop_Invariant_Token =>
+               Contract_Node.Is_Loop_Invariant := True;
+            when Loop_Variant_Token =>
+               Contract_Node.Is_Loop_Invariant := False;
+            when others =>
+               Log_Compiler_Error (Compiler_Obj,
+                  Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index),
+                  "Expected 'loop_invariant' or 'loop_variant' in loop attribute");
+               raise Program_Error;
+         end case;
+         Lexer.Get_Next_Token (Compiler_Obj);  --  Skip keyword
+         Expect_Token (Compiler_Obj, Left_Parenthesis_Token);
+         Parse_Expression (Compiler_Obj);
+         Expect_Token (Compiler_Obj, Right_Parenthesis_Token);
+         Expect_Token (Compiler_Obj, Right_Double_Square_Parenthesis_Token);
+         --  Link into list
+         if First_Contract = null then
+            First_Contract := Contract_Node;
+         else
+            Last_Contract.Next_Sibling := Contract_Node;
+         end if;
+         Last_Contract := Contract_Node;
+      end loop;
+   end Parse_Loop_Contracts;
 
    procedure Parse_Statement_Block (Compiler_Obj : in out Compiler_Type;
                                    Block_Node : out AST_Node_Pointer_Type)
@@ -278,6 +322,7 @@ package body STC_Compiler.Parser is
                Parse_Expression (Compiler_Obj);
                --  TODO: Get condition from operand stack
                Expect_Token (Compiler_Obj, Right_Parenthesis_Token);
+               Parse_Loop_Contracts (Compiler_Obj, While_Node.While_Loop_Contracts);
                Parse_Statement_Block (Compiler_Obj, While_Node.While_Body);
                Statement_Node := While_Node;
             end;
@@ -307,6 +352,7 @@ package body STC_Compiler.Parser is
                   --  TODO: Get increment from operand stack
                end if;
                Expect_Token (Compiler_Obj, Right_Parenthesis_Token);
+               Parse_Loop_Contracts (Compiler_Obj, For_Node.For_Loop_Contracts);
                Parse_Statement_Block (Compiler_Obj, For_Node.For_Body);
                Statement_Node := For_Node;
             end;

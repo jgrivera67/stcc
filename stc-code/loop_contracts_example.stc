@@ -1,0 +1,74 @@
+//
+//  loop_contracts_example.stc -- Examples of [[loop_invariant(...)]] and [[loop_variant(...)]]
+//
+//  Demonstrates stC loop contracts, which map directly to SPARK's Loop_Invariant
+//  and Loop_Variant aspects.
+//
+//  [[loop_invariant(P)]] asserts that boolean predicate P holds on every
+//  iteration of the loop.  GNATprove checks it at loop entry and after each
+//  iteration to prove absence of runtime errors inside the loop body.
+//
+//  [[loop_variant(E)]] provides a termination proof: expression E must
+//  strictly decrease on each iteration and remain non-negative.
+//
+
+import stdint;
+
+module Loop_Examples {
+
+   //  Linear search: returns the index of 'target' in 'arr', or len if not found.
+   uint32_t find(in uint32_t arr[], in uint32_t len, in uint32_t target)
+   {
+      uint32_t i = 0;
+      while (i < len)
+         [[loop_invariant(i <= len)]]
+         [[loop_variant(len - i)]]
+      {
+         if (arr[i] == target) {
+            return i;
+         }
+         i = i + 1;
+      }
+      return len;
+   }
+
+   //  Sum of the first 'len' elements of 'arr'.
+   uint32_t sum(in uint32_t arr[], in uint32_t len)
+   {
+      uint32_t total = 0;
+      uint32_t i = 0;
+      while (i < len)
+         [[loop_invariant(i <= len)]]
+         [[loop_variant(len - i)]]
+      {
+         total = total + arr[i];
+         i = i + 1;
+      }
+      return total;
+   }
+
+   //  Bubble sort: sorts 'arr' in ascending order in-place.
+   void bubble_sort(inout uint32_t arr[], in uint32_t len)
+   {
+      uint32_t n = len;
+      while (n > 1)
+         [[loop_invariant(n <= len)]]
+         [[loop_variant(n)]]
+      {
+         uint32_t i = 0;
+         while (i < n - 1)
+            [[loop_invariant(i < n)]]
+            [[loop_variant(n - 1 - i)]]
+         {
+            if (arr[i] > arr[i + 1]) {
+               uint32_t tmp = arr[i];
+               arr[i] = arr[i + 1];
+               arr[i + 1] = tmp;
+            }
+            i = i + 1;
+         }
+         n = n - 1;
+      }
+   }
+
+}

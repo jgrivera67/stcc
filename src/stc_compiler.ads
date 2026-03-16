@@ -236,6 +236,7 @@ private
       AST_Global_Contract_Node,
       AST_If_Node,
       AST_Literal_Node,
+      AST_Loop_Contract_Node,
       AST_Module_Attribute_Node,
       AST_Statement_Block_Node,
       AST_Struct_Field_Node,
@@ -342,6 +343,7 @@ private
             For_First_Step : AST_Node_Pointer_Type := null;
             For_Condition : AST_Node_Pointer_Type := null;
             For_Next_Step : AST_Node_Pointer_Type := null;
+            For_Loop_Contracts : AST_Node_Pointer_Type := null;
             For_Body : AST_Node_Pointer_Type := null;
          when AST_Function_Call_Node =>
             Function_Reference : AST_Node_Pointer_Type := null;
@@ -384,6 +386,9 @@ private
          when AST_Literal_Node =>
             Literal_Kind : AST_Literal_Kind_Type := AST_Invalid_Literal_Kind;
             Literal_Value : String_Pointer_Type := null;
+         when AST_Loop_Contract_Node =>
+            Is_Loop_Invariant   : Boolean := True;   --  True = invariant, False = variant
+            Loop_Contract_Expr  : AST_Node_Pointer_Type := null;
          when AST_Statement_Block_Node =>
             First_Statement : AST_Node_Pointer_Type := null;
             Local_Symbol_Table : Symbol_Table_Type;
@@ -433,6 +438,7 @@ private
             Variable : AST_Node_Pointer_Type := null;
          when AST_While_Node =>
             While_Condition : AST_Node_Pointer_Type := null;
+            While_Loop_Contracts : AST_Node_Pointer_Type := null;
             While_Body : AST_Node_Pointer_Type := null;
       end case;
    end record;
