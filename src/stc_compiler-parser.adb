@@ -411,6 +411,58 @@ package body STC_Compiler.Parser is
       end loop;
    end Skip_Qualified_Type_Suffixes;
 
+   --  Skip a function declaration or definition starting from the '(' of the parameter list.
+   --  Handles both forward declarations ("name(...) ... ;") and definitions ("name(...) ... { }").
+   --  Tracks parenthesis depth to avoid stopping at '(' or ';' inside annotations.
+   procedure Skip_Function_Decl_Or_Body (Compiler_Obj : in out Compiler_Type) is
+      Parser_Obj : Parser_Type renames Compiler_Obj.Parser_Obj;
+      Paren_Depth : Natural := 0;
+   begin
+      loop
+         case Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind is
+            when Left_Parenthesis_Token =>
+               Paren_Depth := Paren_Depth + 1;
+               Lexer.Get_Next_Token (Compiler_Obj);
+            when Right_Parenthesis_Token =>
+               if Paren_Depth > 0 then
+                  Paren_Depth := Paren_Depth - 1;
+               end if;
+               Lexer.Get_Next_Token (Compiler_Obj);
+            when Left_Curly_Brace_Token =>
+               exit when Paren_Depth = 0;  --  function body starts here
+               Lexer.Get_Next_Token (Compiler_Obj);
+            when Semicolon_Token =>
+               exit when Paren_Depth = 0;  --  forward declaration ends here
+               Lexer.Get_Next_Token (Compiler_Obj);
+            when End_Of_File_Token =>
+               exit;
+            when others =>
+               Lexer.Get_Next_Token (Compiler_Obj);
+         end case;
+      end loop;
+
+      if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Left_Curly_Brace_Token then
+         --  Skip the balanced { ... } function body
+         declare
+            Depth : Natural := 1;
+         begin
+            loop
+               Lexer.Get_Next_Token (Compiler_Obj);
+               exit when Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = End_Of_File_Token;
+               if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Left_Curly_Brace_Token then
+                  Depth := Depth + 1;
+               elsif Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Right_Curly_Brace_Token then
+                  Depth := Depth - 1;
+                  exit when Depth = 0;
+               end if;
+            end loop;
+            Lexer.Get_Next_Token (Compiler_Obj);  --  Consume closing '}'
+         end;
+      elsif Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Semicolon_Token then
+         Lexer.Get_Next_Token (Compiler_Obj);  --  Consume ';' of forward declaration
+      end if;
+   end Skip_Function_Decl_Or_Body;
+
    procedure Parse_Type_Declaration (Compiler_Obj : in out Compiler_Type;
                                      Type_Node : out AST_Node_Pointer_Type) is
       Parser_Obj : Parser_Type renames Compiler_Obj.Parser_Obj;
@@ -489,6 +541,39 @@ package body STC_Compiler.Parser is
                      Field_Is_Pointer : Boolean := False;
                      Field_Attrs      : AST_Node_Pointer_Type := null;
                   begin
+                     --  Skip optional 'volatile' modifier on struct fields
+                     if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Volatile_Token then
+                        Lexer.Get_Next_Token (Compiler_Obj);
+                     end if;
+
+                     --  Skip optional nested type declaration (e.g. "type modular 1 << 8 u8;")
+                     if Parser_Obj.Latest_Tokens
+                           (Parser_Obj.Current_Token_Index).Kind = Type_Token
+                     then
+                        declare
+                           Nested_Depth : Natural := 0;
+                           K : Token_Kind_Type;
+                        begin
+                           loop
+                              K := Parser_Obj.Latest_Tokens
+                                      (Parser_Obj.Current_Token_Index).Kind;
+                              exit when K = End_Of_File_Token;
+                              if K = Left_Parenthesis_Token then
+                                 Nested_Depth := Nested_Depth + 1;
+                              elsif K = Right_Parenthesis_Token then
+                                 if Nested_Depth > 0 then
+                                    Nested_Depth := Nested_Depth - 1;
+                                 end if;
+                              elsif K = Semicolon_Token and then Nested_Depth = 0 then
+                                 Lexer.Get_Next_Token (Compiler_Obj);  --  Consume ';'
+                                 exit;
+                              end if;
+                              Lexer.Get_Next_Token (Compiler_Obj);
+                           end loop;
+                        end;
+                        goto Next_Struct_Field;
+                     end if;
+
                      --  Parse type identifier (may be keyword like 'bool' or user-defined name)
                      if not Is_Type_Name_Token (Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind) then
                         Log_Compiler_Error (Compiler_Obj, "Expected type identifier in struct/union field");
@@ -549,6 +634,7 @@ package body STC_Compiler.Parser is
                      end if;
                      Last_Field := Field_Node;
                   end;
+               <<Next_Struct_Field>> null;
                end loop;
 
                Type_Node.Type_Body := First_Field;
@@ -575,15 +661,53 @@ package body STC_Compiler.Parser is
                if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Assignment_Op_Token then
                   Lexer.Get_Next_Token (Compiler_Obj);
                   Parse_Expression (Compiler_Obj);
-                  --  TODO: Store enum entry value expression
+                  --  Pop the expression result (TODO: store it once code gen is added)
+                  declare
+                     Discarded : AST_Node_Pointer_Type;
+                  begin
+                     Stack_Pop (Parser_Obj.Operand_Stack_Top, null, Discarded);
+                  end;
                end if;
 
                --  Check for comma (more entries) or closing brace (end of enum)
                exit when Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /= Comma_Token;
                Lexer.Get_Next_Token (Compiler_Obj);  --  Skip comma
+               --  Allow trailing comma before '}'
+               exit when Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Right_Curly_Brace_Token;
             end loop;
 
             Expect_Token (Compiler_Obj, Right_Curly_Brace_Token);
+
+         when Void_Token =>
+            --  Function-pointer type: "type void <name>(<params>);"
+            --  The type name comes BEFORE the parameter list, so we must handle
+            --  name extraction and semicolon here and then return.
+            Lexer.Get_Next_Token (Compiler_Obj);  --  Consume 'void' (return type)
+            if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /= Identifier_Token then
+               Log_Compiler_Error (Compiler_Obj, "Expected type name after 'type void'");
+               raise Program_Error;
+            end if;
+            Type_Node.Type_Name := Make_Identifier (Compiler_Obj, Type_Identifier);
+            Lexer.Get_Next_Token (Compiler_Obj);  --  Consume type name
+            --  Skip the parameter list "(...)".
+            Expect_Token (Compiler_Obj, Left_Parenthesis_Token);
+            declare
+               Depth : Natural := 1;
+            begin
+               loop
+                  exit when Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = End_Of_File_Token;
+                  if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Left_Parenthesis_Token then
+                     Depth := Depth + 1;
+                  elsif Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Right_Parenthesis_Token then
+                     Depth := Depth - 1;
+                     exit when Depth = 0;
+                  end if;
+                  Lexer.Get_Next_Token (Compiler_Obj);
+               end loop;
+            end;
+            Expect_Token (Compiler_Obj, Right_Parenthesis_Token);
+            Expect_Token (Compiler_Obj, Semicolon_Token);
+            return;
 
          when others =>
             Log_Compiler_Error (Compiler_Obj, "Expected type declarator (range, modular, struct, enum, or union)");
@@ -705,8 +829,17 @@ package body STC_Compiler.Parser is
                Stack_Pop (Parser_Obj.Operand_Stack_Top, null, Attr_Node.Byte_Offset);
                Expect_Token (Compiler_Obj, Right_Parenthesis_Token);
 
+            when Align_Token =>
+               --  Parse: [[align(expression)]]
+               Attr_Node.Attribute_Kind := Align_Token;
+               Lexer.Get_Next_Token (Compiler_Obj);  --  Skip 'align'
+               Expect_Token (Compiler_Obj, Left_Parenthesis_Token);
+               Parse_Expression (Compiler_Obj);
+               Stack_Pop (Parser_Obj.Operand_Stack_Top, null, Attr_Node.Byte_Offset);
+               Expect_Token (Compiler_Obj, Right_Parenthesis_Token);
+
             when others =>
-               Log_Compiler_Error (Compiler_Obj, "Invalid type attribute (expected 'at')");
+               Log_Compiler_Error (Compiler_Obj, "Invalid type attribute (expected 'at' or 'align')");
                raise Program_Error;
          end case;
 
@@ -770,9 +903,44 @@ package body STC_Compiler.Parser is
                Lexer.Get_Next_Token (Compiler_Obj);  --  Skip identifier
                Expect_Token (Compiler_Obj, Right_Parenthesis_Token);
 
+            when Align_Token =>
+               --  Parse: [[align(expression)]]
+               Attr_Node.Attribute_Kind := Align_Token;
+               Lexer.Get_Next_Token (Compiler_Obj);  --  Skip 'align'
+               Expect_Token (Compiler_Obj, Left_Parenthesis_Token);
+               Parse_Expression (Compiler_Obj);
+               Stack_Pop (Parser_Obj.Operand_Stack_Top, null, Attr_Node.Byte_Offset);
+               Expect_Token (Compiler_Obj, Right_Parenthesis_Token);
+
+            when Section_Token =>
+               --  Parse: [[section("name")]]
+               Attr_Node.Attribute_Kind := Section_Token;
+               Lexer.Get_Next_Token (Compiler_Obj);  --  Skip 'section'
+               Expect_Token (Compiler_Obj, Left_Parenthesis_Token);
+               --  Expect a string literal for the section name; skip it
+               if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /= String_Literal_Token then
+                  Log_Compiler_Error (Compiler_Obj, "Expected string literal in [[section(...)]]");
+                  raise Program_Error;
+               end if;
+               Lexer.Get_Next_Token (Compiler_Obj);  --  Skip string literal
+               Expect_Token (Compiler_Obj, Right_Parenthesis_Token);
+
+            when Export_Token =>
+               --  Parse: [[export("symbol_name")]]
+               Attr_Node.Attribute_Kind := Export_Token;
+               Lexer.Get_Next_Token (Compiler_Obj);  --  Skip 'export'
+               Expect_Token (Compiler_Obj, Left_Parenthesis_Token);
+               --  Expect a string literal for the export symbol name; skip it
+               if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /= String_Literal_Token then
+                  Log_Compiler_Error (Compiler_Obj, "Expected string literal in [[export(...)]]");
+                  raise Program_Error;
+               end if;
+               Lexer.Get_Next_Token (Compiler_Obj);  --  Skip string literal
+               Expect_Token (Compiler_Obj, Right_Parenthesis_Token);
+
             when others =>
                Log_Compiler_Error (Compiler_Obj,
-                  "Invalid variable attribute (expected 'at' or 'refined_state')");
+                  "Invalid variable attribute (expected 'at', 'refined_state', 'align', 'section', or 'export')");
                raise Program_Error;
          end case;
 
@@ -1518,9 +1686,17 @@ package body STC_Compiler.Parser is
             end;
 
          when Foreign_Token =>
-            --  TODO: Parse foreign declaration
-            Lexer.Get_Next_Token (Compiler_Obj);
+            --  Foreign declaration: "foreign convention("C") <return-type> <name>(...) ...;"
             Log_Message ("Parsing foreign declaration (not yet implemented)");
+            Lexer.Get_Next_Token (Compiler_Obj);  --  Consume 'foreign'
+            --  Skip everything up to the '(' of convention(...)
+            while Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /= Left_Parenthesis_Token and then
+                  Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /= End_Of_File_Token
+            loop
+               Lexer.Get_Next_Token (Compiler_Obj);
+            end loop;
+            Skip_Function_Decl_Or_Body (Compiler_Obj);
+            Declaration_Node := null;
 
          when Identifier_Token | Bool_Token | Char_Token =>
             --  Parse variable or function declaration
@@ -1545,38 +1721,10 @@ package body STC_Compiler.Parser is
 
                --  If we see '(' here, the "type" we just parsed was actually a function name
                --  whose return type was already consumed (e.g. void was skipped separately).
-               --  Skip the entire function body and return.
+               --  Skip the entire function (forward decl or body) and return.
                if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Left_Parenthesis_Token then
                   Log_Message ("Skipping function declaration (not yet implemented)");
-                  while Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /=
-                        Left_Curly_Brace_Token and then
-                        Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /=
-                        End_Of_File_Token
-                  loop
-                     Lexer.Get_Next_Token (Compiler_Obj);
-                  end loop;
-                  if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Left_Curly_Brace_Token then
-                     declare
-                        Depth : Natural := 1;
-                     begin
-                        loop
-                           Lexer.Get_Next_Token (Compiler_Obj);
-                           exit when Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind =
-                                     End_Of_File_Token;
-                           if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind =
-                              Left_Curly_Brace_Token
-                           then
-                              Depth := Depth + 1;
-                           elsif Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind =
-                                 Right_Curly_Brace_Token
-                           then
-                              Depth := Depth - 1;
-                              exit when Depth = 0;
-                           end if;
-                        end loop;
-                        Lexer.Get_Next_Token (Compiler_Obj);  --  Consume closing '}'
-                     end;
-                  end if;
+                  Skip_Function_Decl_Or_Body (Compiler_Obj);
                   return;
                end if;
 
@@ -1590,37 +1738,9 @@ package body STC_Compiler.Parser is
 
                --  Check if this is a function (has opening parenthesis after the name)
                if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Left_Parenthesis_Token then
-                  --  This is a function declaration (return_type name(...) {...})
+                  --  This is a function declaration (return_type name(...) { ... } or ;)
                   Log_Message ("Skipping non-void function declaration (not yet implemented)");
-                  while Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /=
-                        Left_Curly_Brace_Token and then
-                        Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /=
-                        End_Of_File_Token
-                  loop
-                     Lexer.Get_Next_Token (Compiler_Obj);
-                  end loop;
-                  if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Left_Curly_Brace_Token then
-                     declare
-                        Depth : Natural := 1;
-                     begin
-                        loop
-                           Lexer.Get_Next_Token (Compiler_Obj);
-                           exit when Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind =
-                                     End_Of_File_Token;
-                           if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind =
-                              Left_Curly_Brace_Token
-                           then
-                              Depth := Depth + 1;
-                           elsif Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind =
-                                 Right_Curly_Brace_Token
-                           then
-                              Depth := Depth - 1;
-                              exit when Depth = 0;
-                           end if;
-                        end loop;
-                        Lexer.Get_Next_Token (Compiler_Obj);  --  Consume closing '}'
-                     end;
-                  end if;
+                  Skip_Function_Decl_Or_Body (Compiler_Obj);
                   return;
                end if;
 
@@ -1662,40 +1782,63 @@ package body STC_Compiler.Parser is
             end;
 
          when Void_Token =>
-            --  Void function declaration — skip until end of function body
-            --  TODO: Parse function declaration fully
+            --  Void function: "void name(...) { ... }" or "void name(...) ...;"
+            --  Skip 'void' and the function name, then hand off to the shared helper.
             Log_Message ("Skipping void function declaration (not yet implemented)");
-            --  Skip past parameter list, optional annotations, and function body
-            while Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /=
-                  Left_Curly_Brace_Token and then
-                  Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /=
-                  End_Of_File_Token
+            --  Skip 'void' and everything up to the opening '(' of the parameter list.
+            while Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /= Left_Parenthesis_Token and then
+                  Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /= End_Of_File_Token
             loop
                Lexer.Get_Next_Token (Compiler_Obj);
             end loop;
-            --  Skip the balanced { ... } function body
-            if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Left_Curly_Brace_Token then
-               declare
-                  Depth : Natural := 1;
-               begin
-                  loop
-                     Lexer.Get_Next_Token (Compiler_Obj);
-                     exit when Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind =
-                               End_Of_File_Token;
-                     if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind =
-                        Left_Curly_Brace_Token
-                     then
-                        Depth := Depth + 1;
-                     elsif Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind =
-                           Right_Curly_Brace_Token
-                     then
-                        Depth := Depth - 1;
-                        exit when Depth = 0;
-                     end if;
-                  end loop;
-                  Lexer.Get_Next_Token (Compiler_Obj);  --  Consume closing '}'
-               end;
+            Skip_Function_Decl_Or_Body (Compiler_Obj);
+
+         when Import_Token =>
+            --  Import declaration inside a module body: "import <dotted-name>;"
+            --  or "private import <dotted-name>;" (private already consumed by caller).
+            --  Consume and skip — import tracking is handled at a higher level.
+            Log_Message ("Parsing import declaration (inside module body)");
+            Lexer.Get_Next_Token (Compiler_Obj);  --  Consume 'import'
+            while Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /= Semicolon_Token
+               and then
+                  Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /= End_Of_File_Token
+            loop
+               Lexer.Get_Next_Token (Compiler_Obj);
+            end loop;
+            if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Semicolon_Token then
+               Lexer.Get_Next_Token (Compiler_Obj);
             end if;
+            Declaration_Node := null;
+
+         when Module_Token =>
+            --  Nested or generic module: "module name { ... }"
+            --                        or  "module name(params) { ... }"
+            --                        or  "module name = other_module(args);"
+            Log_Message ("Skipping module declaration (not yet implemented)");
+            Lexer.Get_Next_Token (Compiler_Obj);  --  Consume 'module'
+            --  Skip name (dotted), optional '= name', until '(', '{', or ';'
+            while Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /= Left_Parenthesis_Token and then
+                  Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /= Left_Curly_Brace_Token and then
+                  Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /= Semicolon_Token and then
+                  Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /= End_Of_File_Token
+            loop
+               Lexer.Get_Next_Token (Compiler_Obj);
+            end loop;
+            Skip_Function_Decl_Or_Body (Compiler_Obj);
+            Declaration_Node := null;
+
+         when Assert_Token =>
+            --  Top-level assert: "assert(<expr>, <string>);"
+            Log_Message ("Skipping assert declaration (not yet implemented)");
+            while Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /= Semicolon_Token and then
+                  Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /= End_Of_File_Token
+            loop
+               Lexer.Get_Next_Token (Compiler_Obj);
+            end loop;
+            if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Semicolon_Token then
+               Lexer.Get_Next_Token (Compiler_Obj);
+            end if;
+            Declaration_Node := null;
 
          when others =>
             Log_Compiler_Error (Compiler_Obj, "Expected declaration");
@@ -1767,7 +1910,16 @@ package body STC_Compiler.Parser is
       --  TODO: Store module name
       Lexer.Get_Next_Token (Compiler_Obj);
 
-      --  TODO: Handle dotted names for child modules (module parent.child {)
+      --  Handle dotted names for child modules: "module parent.child { }"
+      --  Consume any number of ".identifier" segments after the first identifier.
+      while Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Dot_Op_Token loop
+         Lexer.Get_Next_Token (Compiler_Obj);  --  Consume '.'
+         if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /= Identifier_Token then
+            Log_Compiler_Error (Compiler_Obj, "Expected identifier after '.' in module name");
+            raise Program_Error;
+         end if;
+         Lexer.Get_Next_Token (Compiler_Obj);  --  Consume next name segment
+      end loop;
 
       --  Parse optional module-level attributes [[abstract_state(...)]] etc.
       Parse_Module_Attributes (Compiler_Obj, Compilation_Unit_Node);
@@ -2007,6 +2159,7 @@ package body STC_Compiler.Parser is
             Is_Unary_Context : constant Boolean :=
                Previous_Token_Obj.Is_Operator or else
                Previous_Token_Obj.Kind = Left_Parenthesis_Token or else
+               Previous_Token_Obj.Kind = Left_Square_Parenthesis_Token or else
                Previous_Token_Obj.Kind = Comma_Token or else
                Previous_Token_Obj.Kind = Semicolon_Token or else
                Previous_Token_Obj.Kind = Range_Token;
@@ -2175,11 +2328,14 @@ package body STC_Compiler.Parser is
                   --  The identifier is already on the operand stack
                   Lexer.Get_Next_Token (Compiler_Obj);  --  Skip '
 
-                  --  Expect attribute name (first, last, length, range, size)
+                  --  Create a NEW renames after Get_Next_Token so it captures the
+                  --  updated Current_Token_Index (the attribute name token, not the ')
                   declare
-                     Attr_Op : AST_Operator_Type;
+                     Attr_Token : Token_Type renames
+                        Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index);
+                     Attr_Op : AST_Operator_Type := AST_Invalid_Op;
                   begin
-                     case Current_Token_Obj.Kind is
+                     case Attr_Token.Kind is
                         when First_Token =>
                            Attr_Op := AST_First_Attribute_Op;
                         when Last_Token =>
@@ -2190,10 +2346,25 @@ package body STC_Compiler.Parser is
                            Attr_Op := AST_Range_Attribute_Op;
                         when Size_Token =>
                            Attr_Op := AST_Size_Attribute_Op;
+                        when Identifier_Token =>
+                           --  'count and 'size_in_bytes: treat as length-like attributes
+                           if (Attr_Token.String_Length = 5 and then
+                               Attr_Token.String_Buffer (1 .. 5) = "count") or else
+                              (Attr_Token.String_Length = 13 and then
+                               Attr_Token.String_Buffer (1 .. 13) = "size_in_bytes")
+                           then
+                              Attr_Op := AST_Length_Attribute_Op;
+                           else
+                              Log_Compiler_Error (Compiler_Obj,
+                                 Attr_Token,
+                                 "Unknown attribute name after apostrophe");
+                              raise Program_Error;
+                           end if;
                         when others =>
                            Log_Compiler_Error (Compiler_Obj,
-                              Current_Token_Obj,
-                              "Expected attribute name (first, last, length, range, size) after apostrophe");
+                              Attr_Token,
+                              "Expected attribute name (first, last, length, range, size, " &
+                              "count, size_in_bytes) after apostrophe");
                            raise Program_Error;
                      end case;
 

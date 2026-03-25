@@ -818,10 +818,12 @@ is
       Reserved_Words_Table.Insert ("delta", Delta_Token);
       Reserved_Words_Table.Insert ("digits", Digits_Token);
       Reserved_Words_Table.Insert ("abstract_state", Abstract_State_Token); --  module attribute
+      Reserved_Words_Table.Insert ("align", Align_Token); --  type/variable alignment attribute
       Reserved_Words_Table.Insert ("depends", Depends_Token); --  contract clause
       Reserved_Words_Table.Insert ("do", Do_Token);
       Reserved_Words_Table.Insert ("else", Else_Token);
       Reserved_Words_Table.Insert ("enum", Enum_Token);
+      Reserved_Words_Table.Insert ("export", Export_Token); --  variable/function export attribute
       Reserved_Words_Table.Insert ("false", False_Token);
       Reserved_Words_Table.Insert ("first", First_Token); --  attribute
       Reserved_Words_Table.Insert ("fixed", Fixed_Token);
@@ -855,6 +857,7 @@ is
       Reserved_Words_Table.Insert ("refined_state", Refined_State_Token); --  variable attribute
       Reserved_Words_Table.Insert ("renames", Renames_Token);
       Reserved_Words_Table.Insert ("return", Return_Token);
+      Reserved_Words_Table.Insert ("section", Section_Token); --  variable linker section attribute
       Reserved_Words_Table.Insert ("size", Size_Token); --  attribute
       Reserved_Words_Table.Insert ("sizeof", Sizeof_Token);
       Reserved_Words_Table.Insert ("static", Static_Token);
