@@ -21,11 +21,6 @@
         {
           "name": "comment.line.double-slash.stc",
           "match": "//.*$"
-        },
-        {
-          "name": "comment.block.stc",
-          "begin": "/\\*",
-          "end": "\\*/"
         }
       ]
     },
@@ -71,7 +66,7 @@
       "patterns": [
         {
           "name": "keyword.control.stc",
-          "match": "\\b(if|else|while|for|do|loop|switch|case|default|break|continue|return|goto)\\b"
+          "match": "\\b(if|else|while|for|do|switch|case|default|break|continue|return|goto)\\b"
         },
         {
           "name": "keyword.other.stc",
@@ -91,7 +86,11 @@
         },
         {
           "name": "keyword.attribute.hardware.stc",
-          "match": "\\b(offset|bit|bits|at|no_return)\\b"
+          "match": "\\b(offset|bit|bits|at)\\b"
+        },
+        {
+          "name": "keyword.attribute.function.stc",
+          "match": "\\b(no_return)\\b"
         },
         {
           "name": "keyword.other.compile-time.stc",
@@ -130,13 +129,13 @@
       "patterns": [
         {
           "name": "constant.numeric.hex.stc",
-          "comment": "Hex literals with underscore digit separators: 0xfe20_1000, 0x1_0000_0000",
-          "match": "\\b0x[0-9a-fA-F][0-9a-fA-F_]*\\b"
+          "comment": "Hex literals with underscore or apostrophe digit separators: 0xfe20_1000, 0xDEAD'BEEF",
+          "match": "\\b0x[0-9a-fA-F][0-9a-fA-F_']*\\b"
         },
         {
           "name": "constant.numeric.binary.stc",
-          "comment": "Binary literals with underscore digit separators: 0b0001, 0b10_0000",
-          "match": "\\b0b[01][01_]*\\b"
+          "comment": "Binary literals with underscore or apostrophe digit separators: 0b0001, 0b10_0000, 0b1111'0000",
+          "match": "\\b0b[01][01_']*\\b"
         },
         {
           "name": "constant.numeric.float.stc",
@@ -144,8 +143,8 @@
         },
         {
           "name": "constant.numeric.decimal.stc",
-          "comment": "Decimal literals with underscore digit separators: 115_200, 48_000_000",
-          "match": "\\b\\d[\\d_]*\\b"
+          "comment": "Decimal literals with underscore or apostrophe digit separators: 115_200, 1'000'000",
+          "match": "\\b\\d[\\d_']*\\b"
         }
       ]
     },
@@ -173,7 +172,7 @@
       "patterns": [
         {
           "name": "constant.language.stc",
-          "match": "\\b(true|false|null)\\b"
+          "match": "\\b(true|false)\\b"
         },
         {
           "name": "constant.language.builtin.stc",
