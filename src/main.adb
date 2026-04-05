@@ -13,9 +13,12 @@ procedure Main with SPARK_Mode => Off is
    File_Name : String (1 .. 256) := [others => ' '];
    File_Name_Length : Natural := 0;
    Machine_Width : Positive := 32;  -- Default value
+   Output_Dir : String (1 .. 256) := [others => ' '];
+   Output_Dir_Length : Natural := 0;
 begin
    if Ada.Command_Line.Argument_Count = 0 then
-      Ada.Text_IO.Put_Line (Ada.Text_IO.Standard_Error, "Usage: stcc [--machine-width=N] <.stc file>");
+      Ada.Text_IO.Put_Line (Ada.Text_IO.Standard_Error,
+                            "Usage: stcc [--machine-width=N] [--output-dir=DIR] <.stc file>");
       raise Program_Error;
    end if;
 
@@ -26,6 +29,9 @@ begin
       begin
          if Arg'Length > 16 and then Arg (Arg'First .. Arg'First + 15) = "--machine-width=" then
             Machine_Width := Positive'Value (Arg (Arg'First + 16 .. Arg'Last));
+         elsif Arg'Length > 13 and then Arg (Arg'First .. Arg'First + 12) = "--output-dir=" then
+            Output_Dir_Length := Arg'Length - 13;
+            Output_Dir (1 .. Output_Dir_Length) := Arg (Arg'First + 13 .. Arg'Last);
          elsif Arg (Arg'First) /= '-' then
             --  This is the file name
             File_Name_Length := Arg'Length;
@@ -42,7 +48,9 @@ begin
       raise Program_Error;
    end if;
 
-   STC_Compiler.Compile_File (File_Name (1 .. File_Name_Length), Machine_Width);
+   STC_Compiler.Compile_File (File_Name (1 .. File_Name_Length),
+                               Machine_Width,
+                               Output_Dir (1 .. Output_Dir_Length));
 
 exception
    when others =>

@@ -4,6 +4,7 @@
   "scopeName": "source.stc",
   "patterns": [
     { "include": "#comments" },
+    { "include": "#inline-asm" },
     { "include": "#annotations" },
     { "include": "#tick-attributes" },
     { "include": "#keywords" },
@@ -21,6 +22,52 @@
         {
           "name": "comment.line.double-slash.stc",
           "match": "//.*$"
+        }
+      ]
+    },
+
+    "inline-asm": {
+      "comment": "Inline assembly block: asm [volatile] ( template [: outputs [: inputs [: clobbers]]] ) ;",
+      "patterns": [
+        {
+          "name": "meta.block.inline-asm.stc",
+          "begin": "\\b(asm)\\b\\s*(\\bvolatile\\b)?\\s*(\\()",
+          "end": "\\)",
+          "beginCaptures": {
+            "1": { "name": "keyword.other.stc" },
+            "2": { "name": "keyword.other.stc" },
+            "3": { "name": "punctuation.section.parens.begin.stc" }
+          },
+          "endCaptures": {
+            "0": { "name": "punctuation.section.parens.end.stc" }
+          },
+          "patterns": [
+            { "include": "#comments" },
+            {
+              "comment": "Assembly template and constraint strings",
+              "name": "string.quoted.double.asm.stc",
+              "begin": "\"",
+              "end": "\"",
+              "patterns": [
+                {
+                  "name": "constant.character.escape.asm.stc",
+                  "match": "\\\\[ntrx0\\\\\"']|%\\[?[a-zA-Z_][a-zA-Z0-9_]*\\]?|%[0-9]+"
+                }
+              ]
+            },
+            {
+              "comment": "Symbolic operand name: [name]",
+              "name": "variable.other.asm-operand.stc",
+              "match": "\\[[a-zA-Z_][a-zA-Z0-9_]*\\]"
+            },
+            {
+              "comment": "Section separator colons",
+              "name": "punctuation.separator.asm.stc",
+              "match": ":"
+            },
+            { "include": "#numbers" },
+            { "include": "#operators" }
+          ]
         }
       ]
     },
@@ -70,7 +117,7 @@
         },
         {
           "name": "keyword.other.stc",
-          "match": "\\b(module|import|generic|type|subtype|const|foreign|private|packed|volatile|static|auto|sizeof)\\b"
+          "match": "\\b(module|import|generic|type|subtype|const|extern|private|packed|volatile|static|auto|sizeof|asm)\\b"
         },
         {
           "name": "keyword.type.stc",
@@ -94,7 +141,7 @@
         },
         {
           "name": "keyword.other.compile-time.stc",
-          "match": "\\b(compile_if|convention|renames|as)\\b"
+          "match": "\\b(compile_if|renames|as)\\b"
         }
       ]
     },

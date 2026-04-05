@@ -800,6 +800,7 @@ is
       Post => not Reserved_Words_Table.Is_Empty is
    begin
       Reserved_Words_Table.Insert ("as", As_Token);
+      Reserved_Words_Table.Insert ("asm", Asm_Token);
       Reserved_Words_Table.Insert ("at", At_Token); --  attribute
       Reserved_Words_Table.Insert ("assert", Assert_Token);
       Reserved_Words_Table.Insert ("auto", Auto_Token);
@@ -812,7 +813,7 @@ is
       Reserved_Words_Table.Insert ("compile_if", Compile_If_Token);
       Reserved_Words_Table.Insert ("const", Const_Token);
       Reserved_Words_Table.Insert ("continue", Continue_Token);
-      Reserved_Words_Table.Insert ("convention", Convention_Token); --  attribute
+      Reserved_Words_Table.Insert ("extern", Extern_Token);
       Reserved_Words_Table.Insert ("decimal", Decimal_Token);
       Reserved_Words_Table.Insert ("default", Default_Token);
       Reserved_Words_Table.Insert ("delta", Delta_Token);
@@ -829,7 +830,6 @@ is
       Reserved_Words_Table.Insert ("fixed", Fixed_Token);
       Reserved_Words_Table.Insert ("float", Float_Token);
       Reserved_Words_Table.Insert ("for", For_Token);
-      Reserved_Words_Table.Insert ("foreign", Foreign_Token);
       Reserved_Words_Table.Insert ("generic", Generic_Token); --  generic formal part
       Reserved_Words_Table.Insert ("global", Global_Token); --  contract clause
       Reserved_Words_Table.Insert ("goto", Goto_Token);

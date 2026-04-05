@@ -151,6 +151,12 @@ types are \verb'bool' and \verb'char'.
       However, inherited private declarations cannot be used in the visible parts of the module's public
       declarations.
 
+\item A parent module can access its child modules' public declarations without an explicit
+      \verb'import'.  Combined with the rule above, parent--child module name resolution is
+      \emph{bidirectional}: children inherit parent declarations, and parents can reference
+      child declarations.  The \verb'import' statement is only needed for unrelated modules
+      and for sibling modules within the same module family.
+
 \item A child module can be declared \emph{private} by prefixing its \verb'module' declaration with the
       \verb'private' keyword.  A private child module is only accessible to its parent module and to
       sibling modules within the same module family; it cannot be imported by unrelated modules.
@@ -196,10 +202,10 @@ The following identifiers are reserved as keywords and cannot be used as identif
 \begin{lstlisting}
 abstract_state  as              assert          auto            bit
 bits            bool            break           case            char
-compile_if      const           continue        convention      decimal
-default         delta           depends         digits          do
-else            enum            false           first           fixed
-float           for             foreign         generic         global
+compile_if      const           continue        decimal         default
+delta           depends         digits          do              else
+enum            extern          false           first           fixed
+float           for             generic         global
 goto            if              import          in              inout
 last            loop_invariant  loop_variant    modular         module
 offset          out             packed          post            pre
@@ -355,8 +361,7 @@ import stdio as io;
 
 module hello {
 
-  foreign convention("C")
-  int printf(in char* format);
+  extern int printf(in char* format);
 
   int main() {
     printf("Hello, World!\n");
@@ -1164,6 +1169,60 @@ module geometry {
 }
 \end{lstlisting}
 
+\section{Extern Declarations}
+
+The \texttt{extern} keyword declares a variable or function that is defined
+externally in C (or any C-ABI-compatible language).  All \texttt{extern}
+symbols are assumed to follow the C calling convention; no convention
+specifier is needed.
+
+\textbf{Syntax:}
+\begin{lstlisting}
+extern <type> <variable-name>;
+extern const <type> <variable-name>;
+extern <return-type> <function-name>(<params>);
+\end{lstlisting}
+
+The optional \texttt{const} qualifier declares that the external symbol is
+read-only (maps to Ada's \texttt{constant} aspect).
+
+\textbf{Extern function declarations:}
+\begin{lstlisting}
+module stdio_wrap {
+
+  // Declare C standard library functions
+  extern int printf(in char* format);
+  extern int puts(in char* s);
+  extern void* malloc(in int size);
+  extern void  free(in void* ptr);
+
+  void example() {
+    printf("result = %d\n", puts("hello"));
+  }
+
+}
+\end{lstlisting}
+
+\textbf{Extern variable and const declarations:}
+\begin{lstlisting}
+module posix_wrap {
+
+  // Mutable external variable
+  extern int errno;
+
+  // Read-only external constant (e.g. declared as "const int" in C)
+  extern const int INT_MAX;
+  extern const int PATH_MAX;
+
+  void check_error() {
+    if (errno != 0) {
+      // handle error
+    }
+  }
+
+}
+\end{lstlisting}
+
 \section{Child Modules}
 
 A \emph{public} child module is visible to any module that imports it.
@@ -1267,6 +1326,135 @@ module board {
 
 }
 \end{lstlisting}
+
+\subsection{Parent--Child Module Resolution}
+
+Name resolution between a parent module and its child modules is \emph{bidirectional}
+and \emph{automatic}---no \verb'import' statement is required in either direction.
+
+\begin{itemize}
+\item \textbf{Child to parent} (already covered above): a child module inherits all
+      public and private declarations of its ancestor modules and can use them
+      without an \verb'import'.
+\item \textbf{Parent to child}: a parent module can reference the public declarations
+      of any of its direct child modules by using the fully qualified name
+      (e.g.\ \verb'logger.output.write_line(...)') without importing the child.
+\item \textbf{Sibling modules}: sibling child modules (children of the same parent)
+      must use an explicit \verb'import' to access each other's declarations.
+\item \textbf{Unrelated modules}: modules that are not in the same parent--child
+      hierarchy must use an explicit \verb'import'.
+\end{itemize}
+
+The compiler implements this through two-pass resolution:
+\begin{enumerate}
+\item \textbf{First pass}: scan all modules and extract their public interfaces
+      (types, function signatures, constants).
+\item \textbf{Second pass}: resolve all names across the module tree and compile
+      function bodies.
+\end{enumerate}
+
+This design eliminates the circular dependency that would arise if the parent had to
+\verb'import' its child while the child simultaneously depends on the parent.
+In Ada, this circularity is avoided because the parent \emph{specification} does not
+depend on the child---only the parent \emph{body} does, and bodies are compiled after
+all specifications.  Since \emph{stC} does not separate specification and body,
+bidirectional parent--child resolution achieves the same effect without requiring
+two files per module.
+
+\textbf{Example --- parent module (\texttt{logger.stc}):}
+
+\begin{lstlisting}
+// File: logger.stc
+// No import needed for child modules logger.output or logger.formatting
+import uart;
+
+module logger {
+
+  type enum { debug = 0, info = 1, error = 2 } log_level_t;
+
+  void put_char(in char c) {
+    uart.send(c);
+  }
+
+  void print_string(in char[] s) {
+    for (type range 0 .. 65535 uint16_t i in s'range) {
+      put_char(s[i]);
+    }
+  }
+
+  // References child module logger.output -- no import needed
+  void system_error(in char[] msg)
+    [[no_return]]
+  {
+    logger.output.write_line(error, msg);
+    print_string("*** System halted ***\n");
+  }
+
+}
+\end{lstlisting}
+
+\textbf{Example --- child module (\texttt{logger.output.stc}):}
+
+\begin{lstlisting}
+// File: logger.output.stc
+// No import needed for parent module logger
+
+module logger.output {
+
+  // Inherits log_level_t, put_char, print_string from parent
+
+  void write_line(in log_level_t level, in char[] msg) {
+    // Uses parent's print_string -- no import needed
+    if (level == error) {
+      print_string("ERROR: ");
+    } else if (level == info) {
+      print_string("INFO: ");
+    } else {
+      print_string("DEBUG: ");
+    }
+    print_string(msg);
+    put_char('\n');
+  }
+
+}
+\end{lstlisting}
+
+\textbf{Example --- sibling child module (\texttt{logger.formatting.stc}):}
+
+\begin{lstlisting}
+// File: logger.formatting.stc
+// No import needed for parent module logger (automatic)
+// Explicit import needed for sibling module logger.output
+import logger.output;
+
+module logger.formatting {
+
+  // Inherits log_level_t, print_string from parent (automatic)
+
+  void log_key_value(in log_level_t level,
+                     in char[] key,
+                     in char[] value) {
+    print_string(key);        // parent declaration (automatic)
+    print_string(": ");
+    // Sibling declaration (requires import above)
+    logger.output.write_line(level, value);
+  }
+
+}
+\end{lstlisting}
+
+\textbf{Summary of resolution rules:}
+
+\begin{center}
+\begin{tabular}{lll}
+\textbf{Relationship} & \textbf{Import needed?} & \textbf{Example} \\
+\hline
+Child $\to$ Parent & No (automatic) & \verb'logger.output' uses \verb'print_string' \\
+Parent $\to$ Child & No (automatic) & \verb'logger' uses \verb'logger.output.write_line' \\
+Sibling $\to$ Sibling & Yes & \verb'logger.formatting' imports \verb'logger.output' \\
+Unrelated & Yes & \verb'logger' imports \verb'uart' \\
+\end{tabular}
+\end{center}
 
 \section{Compile-Time Conditionals}
 The \verb'compile_if' statement allows for conditional compilation based on constant expressions evaluated at compile time. This is useful for platform-specific code or conditional features.
@@ -1475,8 +1663,8 @@ import Fixed_Queue(T => uint8_t, Capacity => 64) as Byte_Queue;
    <subtype-declaration> |
    <global-variable-declaration> |
    <function-declaration> |
-   <foreign-variable-declaration> |
-   <foreign-function-declaration> |
+   <extern-variable-declaration> |
+   <extern-function-declaration> |
    <compile-if-declaration>
 
 <constant-declaration> ::=
@@ -1639,13 +1827,11 @@ import Fixed_Queue(T => uint8_t, Capacity => 64) as Byte_Queue;
 
 <function-call-argument> ::= <expression>
 
-<foreign-variable-declaration> ::=
-   "foreign" "convention" "(" <string-literal> ")"
-   <type-identifier> <global-variable-declarator> ";"
+<extern-variable-declaration> ::=
+   "extern" ("const")? <type-identifier> <global-variable-declarator> ";"
 
-<foreign-function-declaration> ::=
-   "foreign" "convention" "(" <string-literal> ")"
-   ("void" | <type-identifier> ("*")?) <function-identifier>
+<extern-function-declaration> ::=
+   "extern" ("void" | <type-identifier> ("*")?) <function-identifier>
    "(" (<param-declaration> ("," <param-declaration>)*)? ")" ";"
 
 <expression> ::= <ternary-expression>

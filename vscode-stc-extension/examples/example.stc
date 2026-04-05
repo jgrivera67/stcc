@@ -44,6 +44,67 @@ module example {
   const uint16_t BIG_NUMBER = 0xDEAD_BEEF;
   const byte_t FLAGS = 0b1111_1111;
 
+  // Extern function declarations (C calling convention assumed)
+  extern int printf(in char* format);
+  extern int puts(in char* s);
+  extern void* malloc(in int size);
+  extern void  free(in void* ptr);
+
+  // Extern mutable variable
+  extern int errno;
+
+  // Extern const declarations (read-only C constants)
+  extern const int INT_MAX;
+  extern const int PATH_MAX;
+
+  void greet() {
+    puts("Hello from stC!");
+    printf("errno = %d\n", errno);
+  }
+
+  // Inline assembly — GCC-style syntax
+  //
+  //   asm [volatile] ( "template"
+  //                  : [output_operands]
+  //                  : [input_operands]
+  //                  : [clobbers] ) ;
+  //
+  // Each operand: ["[" name "]"] "constraint" ( expression )
+
+  // Simple instruction with no operands
+  void cpu_nop() {
+    asm("nop");
+  }
+
+  // Read a special-purpose register (output-only operand)
+  uint32_t read_cpsr() {
+    uint32_t cpsr_val;
+    asm volatile ("mrs %[r], cpsr"
+                  : [r] "=r" (cpsr_val)
+                  :
+                  : "cc");
+    return cpsr_val;
+  }
+
+  // Atomic compare-and-swap (output + input operands, memory clobber)
+  bool cas(in uint32_t* addr, in uint32_t expected, in uint32_t desired) {
+    uint32_t old_val;
+    asm volatile ("ldrex %[old], [%[ptr]]\n\t"
+                  "cmp   %[old], %[exp]\n\t"
+                  "strexeq %[old], %[new], [%[ptr]]"
+                  : [old] "=&r" (old_val)
+                  : [ptr] "r"   (addr),
+                    [exp] "r"   (expected),
+                    [new] "r"   (desired)
+                  : "cc", "memory");
+    return old_val == 0;
+  }
+
+  // Data-memory barrier — no operands, clobber only
+  void dmb() {
+    asm volatile ("dmb sy" : : : "memory");
+  }
+
   private
 
   // Private declarations

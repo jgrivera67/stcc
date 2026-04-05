@@ -12,7 +12,9 @@ private with Ada.Text_IO;
 private with Ada.Containers.Indefinite_Ordered_Maps;
 
 package STC_Compiler is
-   procedure Compile_File (File_Name : String; Machine_Width : Positive := 32);
+   procedure Compile_File (File_Name    : String;
+                           Machine_Width : Positive := 32;
+                           Output_Dir   : String := "");
 
 private
    type String_Pointer_Type is access String;
@@ -20,6 +22,7 @@ private
    type Token_Kind_Type is (
       Abstract_State_Token,
       Ampersand_Op_Token,
+      Asm_Token,
       Apostrophe_Op_Token,
       Arrow_Op_Token,
       As_Token,
@@ -56,7 +59,7 @@ private
       Compile_If_Token,
       Const_Token,
       Continue_Token,
-      Convention_Token,
+      Extern_Token,
       Decimal_Token,
       Decimal_Integer_Literal_Token,
       Default_Token,
@@ -78,7 +81,6 @@ private
       Float_Token,
       Floating_Point_Literal_Token,
       For_Token,
-      Foreign_Token,
       Generic_Token,
       Global_Token,
       Goto_Token,
@@ -222,6 +224,8 @@ private
 
    type AST_Node_Kind_Type is (
       AST_Aggregate_Literal_Node,
+      AST_Asm_Operand_Node,
+      AST_Inline_Asm_Node,
       AST_Binary_Expression_Node,
       AST_Compilation_Unit_Node,
       AST_Depends_Contract_Node,
@@ -319,6 +323,18 @@ private
       case Node_Kind is
          when AST_Aggregate_Literal_Node =>
             Aggregate_Elements : AST_Node_Pointer_Type := null;
+         when AST_Asm_Operand_Node =>
+            --  One output or input operand: ["[" name "]"] "constraint" "(" expr ")"
+            Operand_Symbolic_Name : String_Pointer_Type := null;  -- null when absent
+            Operand_Constraint    : String_Pointer_Type := null;
+            Operand_Expression    : AST_Node_Pointer_Type := null;
+         when AST_Inline_Asm_Node =>
+            --  asm [volatile] ( "template" [: outputs [: inputs [: clobbers]]] ) ;
+            Asm_Is_Volatile     : Boolean := False;
+            Asm_Template        : String_Pointer_Type := null;
+            Asm_Output_Operands : AST_Node_Pointer_Type := null;  -- linked via Next_Sibling
+            Asm_Input_Operands  : AST_Node_Pointer_Type := null;  -- linked via Next_Sibling
+            Asm_First_Clobber   : AST_Node_Pointer_Type := null;  -- AST_Literal_Node list
          when AST_Binary_Expression_Node =>
             Binary_Operator : AST_Operator_Type := AST_Invalid_Op;
             Left_Operand : AST_Node_Pointer_Type := null;

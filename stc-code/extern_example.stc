@@ -1,0 +1,43 @@
+//
+//  extern_example.stc -- Extern declarations for C interoperability
+//
+//  The extern keyword declares variables and functions that are defined
+//  externally in C (or any C-ABI-compatible language).  All extern symbols
+//  are assumed to follow the C calling convention; no convention specifier
+//  is needed.
+//
+
+module extern_example {
+
+  //
+  // Extern function declarations: C standard I/O
+  //
+  extern int printf(in char* format);
+  extern int puts(in char* s);
+
+  //
+  // Extern function declarations: C standard memory allocation
+  //
+  extern void* malloc(in int size);
+  extern void  free(in void* ptr);
+
+  //
+  // Extern variable declaration: C standard errno (mutable)
+  //
+  extern int errno;
+
+  //
+  // Extern const declarations: read-only C constants
+  //
+  extern const int INT_MAX;
+  extern const int PATH_MAX;
+
+  //
+  // A wrapper that calls extern C functions
+  //
+  void greet() {
+    puts("Hello from stC!");
+    printf("errno = %d\n", errno);
+  }
+
+}

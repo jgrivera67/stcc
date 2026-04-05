@@ -145,6 +145,9 @@ package body STC_Compiler.Parser is
    procedure Parse_Statement (Compiler_Obj : in out Compiler_Type;
                               Statement_Node : out AST_Node_Pointer_Type);
 
+   procedure Parse_Inline_Asm (Compiler_Obj : in out Compiler_Type;
+                                Asm_Node     : out AST_Node_Pointer_Type);
+
    procedure Parse_Declaration (Compiler_Obj : in out Compiler_Type;
                                Declaration_Node : out AST_Node_Pointer_Type);
 
@@ -280,6 +283,154 @@ package body STC_Compiler.Parser is
       Expect_Token (Compiler_Obj, Right_Curly_Brace_Token);
    end Parse_Statement_Block;
 
+   --  Parse GCC-style inline assembly:
+   --
+   --  asm_stmt     ::= "asm" ["volatile"] "(" asm_template
+   --                       [":" [asm_operand_list]
+   --                           [":" [asm_operand_list]
+   --                               [":" [asm_clobber_list]]]]
+   --                   ")" ";"
+   --
+   --  asm_template      ::= string_literal
+   --  asm_operand_list  ::= asm_operand { "," asm_operand }
+   --  asm_operand       ::= ["[" identifier "]"] string_literal "(" expression ")"
+   --  asm_clobber_list  ::= string_literal { "," string_literal }
+   --
+   procedure Parse_Inline_Asm (Compiler_Obj : in out Compiler_Type;
+                                Asm_Node     : out AST_Node_Pointer_Type)
+   is
+      Parser_Obj : Parser_Type renames Compiler_Obj.Parser_Obj;
+
+      function Current_Kind return Token_Kind_Type is
+        (Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind);
+
+      function Current_Token return Token_Type is
+        (Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index));
+
+      --  Parse a single output or input operand: ["[" name "]"] "constraint" "(" expr ")"
+      procedure Parse_Asm_Operand (Operand_Node : out AST_Node_Pointer_Type) is
+         Op : constant AST_Node_Pointer_Type := new AST_Node_Type (AST_Asm_Operand_Node);
+      begin
+         --  Optional symbolic name: "[" identifier "]"
+         if Current_Kind = Left_Square_Parenthesis_Token then
+            Lexer.Get_Next_Token (Compiler_Obj);  --  skip '['
+            if Current_Kind /= Identifier_Token then
+               Log_Compiler_Error (Compiler_Obj, Current_Token,
+                  "Expected identifier for asm operand symbolic name");
+               raise Program_Error;
+            end if;
+            Op.Operand_Symbolic_Name :=
+               new String'(Current_Token.String_Buffer (1 .. Current_Token.String_Length));
+            Lexer.Get_Next_Token (Compiler_Obj);  --  skip identifier
+            Expect_Token (Compiler_Obj, Right_Square_Parenthesis_Token);  --  skip ']'
+         end if;
+
+         --  Constraint string literal
+         if Current_Kind /= String_Literal_Token then
+            Log_Compiler_Error (Compiler_Obj, Current_Token,
+               "Expected constraint string in asm operand");
+            raise Program_Error;
+         end if;
+         Op.Operand_Constraint :=
+            new String'(Current_Token.String_Buffer (1 .. Current_Token.String_Length));
+         Lexer.Get_Next_Token (Compiler_Obj);  --  skip constraint string
+
+         --  "(" expression ")"
+         Expect_Token (Compiler_Obj, Left_Parenthesis_Token);
+         Parse_Expression (Compiler_Obj);
+         --  TODO: Attach parsed expression to Op.Operand_Expression
+         Expect_Token (Compiler_Obj, Right_Parenthesis_Token);
+
+         Operand_Node := Op;
+      end Parse_Asm_Operand;
+
+      --  Parse a comma-separated list of operands; stop at ':' or ')'
+      procedure Parse_Asm_Operand_List (First_Operand : out AST_Node_Pointer_Type) is
+         Last_Operand : AST_Node_Pointer_Type := null;
+         Operand_Node : AST_Node_Pointer_Type;
+      begin
+         First_Operand := null;
+         while Current_Kind /= Colon_Token and then Current_Kind /= Right_Parenthesis_Token loop
+            Parse_Asm_Operand (Operand_Node);
+            if First_Operand = null then
+               First_Operand := Operand_Node;
+            else
+               Last_Operand.Next_Sibling := Operand_Node;
+            end if;
+            Last_Operand := Operand_Node;
+            exit when Current_Kind /= Comma_Token;
+            Lexer.Get_Next_Token (Compiler_Obj);  --  skip ','
+         end loop;
+      end Parse_Asm_Operand_List;
+
+      --  Parse a comma-separated list of clobber strings; stop at ')'
+      procedure Parse_Asm_Clobber_List (First_Clobber : out AST_Node_Pointer_Type) is
+         Last_Clobber  : AST_Node_Pointer_Type := null;
+         Clobber_Node  : AST_Node_Pointer_Type;
+      begin
+         First_Clobber := null;
+         while Current_Kind = String_Literal_Token loop
+            Clobber_Node := new AST_Node_Type (AST_Literal_Node);
+            Clobber_Node.Literal_Kind  := AST_String_Literal_Kind;
+            Clobber_Node.Literal_Value :=
+               new String'(Current_Token.String_Buffer (1 .. Current_Token.String_Length));
+            Lexer.Get_Next_Token (Compiler_Obj);  --  skip clobber string
+            if First_Clobber = null then
+               First_Clobber := Clobber_Node;
+            else
+               Last_Clobber.Next_Sibling := Clobber_Node;
+            end if;
+            Last_Clobber := Clobber_Node;
+            exit when Current_Kind /= Comma_Token;
+            Lexer.Get_Next_Token (Compiler_Obj);  --  skip ','
+         end loop;
+      end Parse_Asm_Clobber_List;
+
+      Node : constant AST_Node_Pointer_Type := new AST_Node_Type (AST_Inline_Asm_Node);
+   begin
+      Lexer.Get_Next_Token (Compiler_Obj);  --  skip 'asm'
+
+      --  Optional 'volatile' qualifier
+      if Current_Kind = Volatile_Token then
+         Node.Asm_Is_Volatile := True;
+         Lexer.Get_Next_Token (Compiler_Obj);  --  skip 'volatile'
+      end if;
+
+      Expect_Token (Compiler_Obj, Left_Parenthesis_Token);
+
+      --  Assembly template string
+      if Current_Kind /= String_Literal_Token then
+         Log_Compiler_Error (Compiler_Obj, Current_Token,
+            "Expected assembly template string after 'asm('");
+         raise Program_Error;
+      end if;
+      Node.Asm_Template :=
+         new String'(Current_Token.String_Buffer (1 .. Current_Token.String_Length));
+      Lexer.Get_Next_Token (Compiler_Obj);  --  skip template string
+
+      --  Optional output operands section (first ':')
+      if Current_Kind = Colon_Token then
+         Lexer.Get_Next_Token (Compiler_Obj);  --  skip ':'
+         Parse_Asm_Operand_List (Node.Asm_Output_Operands);
+
+         --  Optional input operands section (second ':')
+         if Current_Kind = Colon_Token then
+            Lexer.Get_Next_Token (Compiler_Obj);  --  skip ':'
+            Parse_Asm_Operand_List (Node.Asm_Input_Operands);
+
+            --  Optional clobbers section (third ':')
+            if Current_Kind = Colon_Token then
+               Lexer.Get_Next_Token (Compiler_Obj);  --  skip ':'
+               Parse_Asm_Clobber_List (Node.Asm_First_Clobber);
+            end if;
+         end if;
+      end if;
+
+      Expect_Token (Compiler_Obj, Right_Parenthesis_Token);
+      Expect_Token (Compiler_Obj, Semicolon_Token);
+      Asm_Node := Node;
+   end Parse_Inline_Asm;
+
    procedure Parse_Statement (Compiler_Obj : in out Compiler_Type;
                              Statement_Node : out AST_Node_Pointer_Type)
    is
@@ -366,6 +517,9 @@ package body STC_Compiler.Parser is
             end if;
             Expect_Token (Compiler_Obj, Semicolon_Token);
             --  TODO: Create and return statement node
+
+         when Asm_Token =>
+            Parse_Inline_Asm (Compiler_Obj, Statement_Node);
 
          when Left_Curly_Brace_Token =>
             --  Nested block
@@ -1685,16 +1839,16 @@ package body STC_Compiler.Parser is
                Declaration_Node := Var_Node;
             end;
 
-         when Foreign_Token =>
-            --  Foreign declaration: "foreign convention("C") <return-type> <name>(...) ...;"
-            Log_Message ("Parsing foreign declaration (not yet implemented)");
-            Lexer.Get_Next_Token (Compiler_Obj);  --  Consume 'foreign'
-            --  Skip everything up to the '(' of convention(...)
-            while Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /= Left_Parenthesis_Token and then
-                  Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind /= End_Of_File_Token
-            loop
-               Lexer.Get_Next_Token (Compiler_Obj);
-            end loop;
+         when Extern_Token =>
+            --  Extern declaration:
+            --    "extern" <return-type> <name>(...) ...;   -- function
+            --    "extern" ["const"] <type> <name> ";"     -- variable
+            Log_Message ("Parsing extern declaration (not yet implemented)");
+            Lexer.Get_Next_Token (Compiler_Obj);  --  Consume 'extern'
+            --  Consume optional 'const' qualifier
+            if Parser_Obj.Latest_Tokens (Parser_Obj.Current_Token_Index).Kind = Const_Token then
+               Lexer.Get_Next_Token (Compiler_Obj);  --  Consume 'const'
+            end if;
             Skip_Function_Decl_Or_Body (Compiler_Obj);
             Declaration_Node := null;
 
